@@ -1,0 +1,65 @@
+# Elixir / Erlang
+_build/
+deps/
+*.ez
+*.beam
+*.plt
+.elixir_ls/
+erl_crash.dump
+
+# Rust
+assignment_core/target/
+*.rs.bk
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+.mypy_cache/
+.ruff_cache/
+
+# Node.js / React
+node_modules/
+dashboard/dist/
+dashboard/build/
+dashboard/coverage/
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test artifacts
+coverage/
+
+# Mix artifacts
+mix.lock is tracked
+/mix.lock
+
+# Phoenix
+/apps/experiment_hub_web/priv/static/assets/
+
+# Docker volumes (local)
+postgres_data/
+redis_data/
+
+# k6 results
+k6/results/
