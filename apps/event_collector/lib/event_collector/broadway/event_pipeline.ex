@@ -9,16 +9,15 @@ defmodule EventCollector.Broadway.EventPipeline do
   alias EventCollector.Broadway.BatchProcessor
 
   @default_config [
-    kafka_brokers: [{"localhost", 9092}],
-    kafka_group_id: "experimenthub-event-collector",
-    kafka_topics: ["experimenthub.events.inbound"],
     batch_size: 100,
     batch_timeout: 1000,
     concurrency: 4
   ]
 
   def start_link(opts \\ []) do
-    config = Keyword.merge(@default_config, opts)
+    config =
+      default_config()
+      |> Keyword.merge(opts)
 
     Broadway.start_link(__MODULE__,
       name: __MODULE__,
@@ -50,6 +49,16 @@ defmodule EventCollector.Broadway.EventPipeline do
           concurrency: 2
         ]
       ]
+    )
+  end
+
+  defp default_config do
+    config = Application.get_env(:event_collector, __MODULE__, [])
+
+    Keyword.merge(@default_config,
+      kafka_brokers: Keyword.get(config, :kafka_brokers, [{"localhost", 9092}]),
+      kafka_group_id: Keyword.get(config, :kafka_group_id, "experimenthub-event-collector"),
+      kafka_topics: Keyword.get(config, :kafka_topics, ["experimenthub.events.inbound"])
     )
   end
 

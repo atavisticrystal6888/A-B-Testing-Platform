@@ -1,0 +1,62 @@
+# syntax=docker/dockerfile:1.7
+
+ARG ELIXIR_VERSION=1.18.4
+ARG OTP_VERSION=27.3.4
+ARG DEBIAN_VERSION=bookworm-20250520
+
+FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION} AS build
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential git pkg-config ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY docker/certs/ /usr/local/share/ca-certificates/
+RUN update-ca-certificates
+
+WORKDIR /app
+
+ENV MIX_ENV=prod
+ENV HEX_CACERTS_PATH=/etc/ssl/certs/ca-certificates.crt
+
+RUN mix local.hex --force && mix local.rebar --force
+
+COPY mix.exs mix.lock ./
+COPY config config
+COPY apps/assignment_engine/mix.exs apps/assignment_engine/mix.exs
+COPY apps/event_collector/mix.exs apps/event_collector/mix.exs
+COPY apps/experiment_hub/mix.exs apps/experiment_hub/mix.exs
+COPY apps/experiment_hub_web/mix.exs apps/experiment_hub_web/mix.exs
+
+RUN mix deps.get --only prod
+RUN mix deps.compile
+
+COPY assignment_core assignment_core
+COPY apps apps
+
+RUN mix compile
+RUN cd apps/experiment_hub_web && mix assets.setup && mix assets.deploy
+RUN mix release experiment_hub_web
+
+FROM debian:bookworm-slim AS runtime
+
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates libgcc-s1 libncurses5 libstdc++6 openssl && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN groupadd --system app && useradd --system --gid app --create-home --home-dir /app app
+
+COPY --from=build /app/_build/prod/rel/experiment_hub_web ./
+
+RUN chown -R app:app /app
+
+USER app
+
+ENV HOME=/app
+EXPOSE 4000
+
+CMD ["bin/experiment_hub_web", "start"]

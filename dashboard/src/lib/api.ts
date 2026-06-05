@@ -11,7 +11,7 @@ export function getApiBaseUrl(): string {
     return normalizeBaseUrl(configuredBaseUrl);
   }
 
-  if (typeof window !== "undefined" && window.location.port === "4000") {
+  if (typeof window !== "undefined") {
     return window.location.origin;
   }
 

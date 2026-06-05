@@ -48,7 +48,7 @@ The project is designed for organizations that want data sovereignty, tenant iso
 - The Feature Flags page currently lists flags; the "Create Flag" button is present in the UI but is not wired into a completed flow.
 - The dashboard does not currently expose a conclude-experiment action; concluding is available through the API.
 - The repository contains controller modules for API keys and users, but those routes are not mounted in the main router right now. For now, create the first tenant user and API keys through Elixir console calls outside the dev bootstrap path.
-- The repository ships Docker Compose files for infrastructure services only. It does not currently ship Dockerfiles for the Phoenix app, statistical engine, or dashboard.
+- The repository now ships production Dockerfiles for the Phoenix release, statistical engine, and dashboard, plus a compose-based release overlay in `docker-compose.release.yml`.
 
 ## 3. How ExperimentHub works
 
@@ -285,13 +285,24 @@ Use one of these:
 
 #### Step 2: Install the same prerequisites as local setup
 
-You still need:
+You have two practical demo paths now:
+
+- Native-process demo: use the full local toolchain.
+- Containerized demo: use the release compose stack and only require Docker plus a filled-in env file.
+
+For the native-process path, you still need:
 
 - Elixir/Erlang
 - Node.js
 - Python 3.12+
 - Rust/Cargo
 - Docker or equivalent infrastructure services
+
+For the containerized demo path, you only need:
+
+- Docker
+- A copy of `release.env.example` saved as `release.env`
+- Real values for the required secrets in that env file
 
 #### Step 3: Start infrastructure services
 
@@ -301,7 +312,20 @@ From the repo root:
 docker compose up -d
 ```
 
-The current repository only provides Docker Compose for PostgreSQL, Kafka, and Redis. It does not provide application-service Dockerfiles yet.
+The repository now includes Dockerfiles for the Phoenix release, statistical engine, and dashboard. For a fully containerized demo or release-like smoke test, combine `docker-compose.yml` with `docker-compose.release.yml`.
+
+If you want that fully containerized demo path, do this instead of the manual backend/frontend startup steps:
+
+```bash
+cp release.env.example release.env
+# edit release.env and replace every placeholder secret
+
+docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml build
+docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml --profile ops run --rm experiment-hub-migrate
+docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml up -d
+```
+
+That path publishes only the dashboard port by default and keeps Phoenix plus the statistical engine on the compose network.
 
 #### Step 4: Build backend dependencies and database state
 
@@ -326,10 +350,10 @@ python -m venv .venv
 . .venv/bin/activate
 cd statistical_engine
 pip install -e ".[dev]"
-INTERNAL_API_KEY=dev-internal-key uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+INTERNAL_API_KEY=replace-with-a-real-shared-secret uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-Keeping the statistical engine on the same host is the easiest path because the Phoenix analysis worker defaults to `http://localhost:8000` and `dev-internal-key` unless you wire custom runtime config.
+Phoenix production startup now expects explicit statistical-engine runtime config instead of falling back to localhost or a dev key.
 
 #### Step 6: Start Phoenix with public host configuration
 
@@ -341,6 +365,10 @@ export PORT=4000
 export PHX_HOST=your-public-host.example.com
 export DATABASE_URL=ecto://experimenthub:experimenthub_dev@localhost/experiment_hub_dev
 export SECRET_KEY_BASE="$(mix phx.gen.secret)"
+export REDIS_URL=redis://localhost:6379
+export STAT_ENGINE_URL=http://127.0.0.1:8000
+export STAT_ENGINE_API_KEY=replace-with-the-same-secret-you-used-for-INTERNAL_API_KEY
+export KAFKA_BROKERS=localhost:9092
 export JWT_SECRET="replace-this-before-sharing-publicly"
 
 MIX_ENV=prod mix phx.server
@@ -350,6 +378,13 @@ If your PostgreSQL deployment requires TLS, also set:
 
 ```bash
 export DB_SSL=true
+```
+
+Optional Kafka overrides:
+
+```bash
+export KAFKA_GROUP_ID=experimenthub-event-collector
+export KAFKA_TOPICS=experimenthub.events.inbound
 ```
 
 #### Step 7: Build the dashboard for the public API URL
@@ -412,80 +447,117 @@ Use this when you want a real multi-user deployment with backups, TLS, monitorin
 
 Recommended current topology:
 
-- Phoenix app on one VM or app host
-- Statistical engine on the same private host or same VM
-- PostgreSQL as either a managed instance or a private database host
-- Redis as either managed or self-hosted
-- Kafka only if you want the full event-ingestion path enabled exactly as designed
-- Static dashboard files served through Nginx, Caddy, or another reverse proxy
+- Preferred current path: the containerized release stack defined by `docker-compose.release.yml`
+- Phoenix app container on the private compose network
+- Statistical engine container on the private compose network
+- Dashboard container serving the UI and reverse-proxying Phoenix routes
+- PostgreSQL as either the bundled compose service or a managed/private database
+- Redis as either the bundled compose service or a managed/private cache
+- Kafka as either the bundled compose service or a managed/private cluster
+
+You can still deploy the services as native processes, but the branch now has a first-class containerized release path and that is the most direct production-like setup.
 
 #### Step 2: Provision production secrets
 
-At minimum:
+Copy `release.env.example` to a real env file and replace every placeholder secret before the first build.
+
+At minimum fill in:
 
 - `DATABASE_URL`
 - `SECRET_KEY_BASE`
 - `JWT_SECRET`
 - `PHX_HOST`
-- `PORT`
+- `REDIS_URL`
+- `STAT_ENGINE_URL`
+- `STAT_ENGINE_API_KEY`
+- `KAFKA_BROKERS`
+
+Common optional overrides:
+
+- `KAFKA_GROUP_ID`
+- `KAFKA_TOPICS`
 - `POOL_SIZE`
-- `DB_SSL` when your DB provider requires TLS
+- `DB_SSL`
+- `POSTGRES_PORT`
+- `DASHBOARD_PORT`
+- `CORS_ORIGINS`
+- `DASHBOARD_VITE_API_URL`
 
-#### Step 3: Build Phoenix in production mode
+Notes:
 
-```bash
-mix deps.get
-cd dashboard && npm install && cd ..
-MIX_ENV=prod mix ecto.create
-MIX_ENV=prod mix ecto.migrate
-```
+- In native-process production mode, `REDIS_URL`, `STAT_ENGINE_URL`, `STAT_ENGINE_API_KEY`, and `KAFKA_BROKERS` are required by `config/runtime.exs`.
+- In the provided release compose stack, some of those values have sensible internal-network defaults in `docker-compose.release.yml`, but you should still review them explicitly in `release.env`.
 
-If you want the Phoenix app's own static assets built and digested, run the task from the Phoenix app directory:
+#### Step 3: Build the release images
 
-```bash
-cd apps/experiment_hub_web
-MIX_ENV=prod mix assets.deploy
-cd ../..
-```
-
-#### Step 4: Build the dashboard against the production API URL
+For the bundled infrastructure services plus the application images, run:
 
 ```bash
-cd dashboard
-VITE_API_URL=https://app.example.com npm run build
+docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml build
 ```
 
-#### Step 5: Start the statistical engine privately
+This builds:
 
-If you keep it on the same host, the current defaults are enough for basic operation.
+- `Dockerfile.experiment-hub-web` for the Phoenix release image
+- `statistical_engine/Dockerfile` for the FastAPI statistical engine
+- `dashboard/Dockerfile` for the static dashboard + same-origin reverse proxy
 
-If you want to move it to another host or change the shared key, update the Phoenix runtime configuration so `:stat_engine_url` and `:stat_engine_api_key` are explicitly set. The current repository does not yet map those values from environment variables for you.
-
-#### Step 6: Start Phoenix behind a reverse proxy
+#### Step 4: Run database migrations from the release image
 
 ```bash
-export PHX_SERVER=true
-export PORT=4000
-export PHX_HOST=app.example.com
-export DATABASE_URL=ecto://USER:PASS@DBHOST/DBNAME
-export SECRET_KEY_BASE="..."
-export JWT_SECRET="..."
-export POOL_SIZE=10
-export DB_SSL=true
-
-MIX_ENV=prod mix phx.server
+docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml --profile ops run --rm experiment-hub-migrate
 ```
 
-#### Step 7: Use same-origin routing in your reverse proxy
+That executes the release-safe migration helper:
 
-Strongly recommended routing shape:
+```bash
+bin/experiment_hub_web eval "ExperimentHub.Release.migrate()"
+```
 
-- `/` -> static dashboard build
-- `/api` -> Phoenix
-- `/v1` -> Phoenix
-- `/socket` -> Phoenix websocket endpoint
+#### Step 5: Start the production stack
 
-This is the simplest production setup for the current frontend code.
+```bash
+docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml up -d
+```
+
+Default exposed endpoint:
+
+- Dashboard + same-origin API proxy: `http://127.0.0.1:8080`
+
+Default internal-only services in this stack:
+
+- Phoenix release: reachable only on the compose network as `experiment-hub-web:4000`
+- Statistical engine: reachable only on the compose network as `statistical-engine:8000`
+
+The dashboard container now serves `/` itself and proxies `/api`, `/v1`, `/socket`, and `/health` to Phoenix. That keeps the frontend same-origin by default and avoids environment-specific dashboard builds unless you intentionally set `DASHBOARD_VITE_API_URL`.
+
+#### Step 6: Smoke test the release
+
+```bash
+curl http://127.0.0.1:8080/
+curl http://127.0.0.1:8080/health
+```
+
+Because the release stack does not publish the statistical-engine port to the host, test that service from inside the compose network instead:
+
+```bash
+docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml exec statistical-engine python -c "from urllib.request import urlopen; print(urlopen('http://127.0.0.1:8000/stats/v1/health').read().decode())"
+```
+
+Keep the engine private unless you have a specific reason to expose it publicly.
+
+#### Step 7: Public hosting and TLS
+
+For internet-facing deployment, put TLS termination in front of the dashboard container and keep Phoenix/statistical-engine private whenever possible.
+
+Recommended routing shape remains:
+
+- `/` -> dashboard container
+- `/api` -> proxied by dashboard container to Phoenix
+- `/v1` -> proxied by dashboard container to Phoenix
+- `/socket` -> proxied by dashboard container to Phoenix websocket endpoint
+
+The dashboard container also proxies `/health` to Phoenix, which is the simplest public health endpoint for the bundled stack.
 
 #### Step 8: Add operational hardening
 
@@ -497,7 +569,7 @@ For a serious deployment, also add:
 - Log aggregation
 - Metrics and uptime monitoring
 - Secret rotation
-- A real internal key for the statistical engine once runtime config is wired for it
+- Managed Postgres, Redis, and Kafka or equivalent persistent infrastructure
 
 ## 8. Step-by-step usage guide
 

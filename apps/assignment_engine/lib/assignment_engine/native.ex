@@ -4,13 +4,12 @@ defmodule AssignmentEngine.Native do
   Provides deterministic variant assignment using MurmurHash3.
   """
 
-  # Only load Rustler NIF if cargo is available
-  @cargo_available System.find_executable("cargo") != nil
-
-  if @cargo_available do
+  if System.get_env("ASSIGNMENT_ENGINE_BUILD_NIF", "") in ["1", "true", "TRUE"] and
+       System.find_executable("cargo") != nil do
     use Rustler,
       otp_app: :assignment_engine,
-      crate: "assignment_core"
+      crate: "assignment_core",
+      path: Path.expand("../../../../assignment_core", __DIR__)
   end
 
   @doc """

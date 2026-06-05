@@ -15,8 +15,6 @@ venv/
 coverage/
 dashboard/dist/
 dashboard/build/
-docker-compose*.yml
-Dockerfile*
 .dockerignore
 .gitignore
 .github/

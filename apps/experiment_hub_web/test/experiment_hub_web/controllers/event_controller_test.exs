@@ -4,6 +4,16 @@ defmodule ExperimentHubWeb.EventControllerTest do
   setup %{conn: conn} do
     tenant = tenant_fixture()
     api_key = api_key_fixture(%{tenant: tenant})
+    original_producer = Application.get_env(:event_collector, :kafka_producer)
+    original_result = Application.get_env(:experiment_hub_web, :test_event_producer_result)
+
+    Application.put_env(:event_collector, :kafka_producer, ExperimentHubWeb.TestEventProducer)
+    Application.put_env(:experiment_hub_web, :test_event_producer_result, :ok)
+
+    on_exit(fn ->
+      restore_application_env(:event_collector, :kafka_producer, original_producer)
+      restore_application_env(:experiment_hub_web, :test_event_producer_result, original_result)
+    end)
 
     conn =
       conn
@@ -46,6 +56,30 @@ defmodule ExperimentHubWeb.EventControllerTest do
         })
 
       assert %{"error" => "validation_error"} = json_response(conn, 400)
+    end
+
+    test "returns 503 when the event queue is unavailable", %{conn: conn} do
+      Application.put_env(
+        :experiment_hub_web,
+        :test_event_producer_result,
+        {:error, :queue_unavailable}
+      )
+
+      conn =
+        post(conn, "/v1/events", %{
+          "experiment_id" => Ecto.UUID.generate(),
+          "user_id" => "user-1",
+          "event_type" => "conversion",
+          "event_name" => "checkout_completed",
+          "value" => 1,
+          "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "idempotency_key" => "evt-queue-down-#{System.unique_integer([:positive])}"
+        })
+
+      assert %{"error" => "service_unavailable", "message" => message} =
+               json_response(conn, 503)
+
+      assert message =~ "queue_unavailable"
     end
   end
 
@@ -104,5 +138,34 @@ defmodule ExperimentHubWeb.EventControllerTest do
       conn = post(conn, "/v1/events/batch", %{})
       assert %{"error" => "validation_error"} = json_response(conn, 400)
     end
+
+    test "returns 503 when accepted events cannot be enqueued", %{conn: conn} do
+      Application.put_env(
+        :experiment_hub_web,
+        :test_event_producer_result,
+        {:error, :queue_unavailable}
+      )
+
+      events = [
+        %{
+          "experiment_id" => Ecto.UUID.generate(),
+          "user_id" => "user-1",
+          "event_type" => "conversion",
+          "event_name" => "checkout",
+          "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "idempotency_key" => "batch-queue-down-#{System.unique_integer([:positive])}"
+        }
+      ]
+
+      conn = post(conn, "/v1/events/batch", %{"events" => events})
+
+      assert %{"error" => "service_unavailable", "message" => message} =
+               json_response(conn, 503)
+
+      assert message =~ "queue_unavailable"
+    end
   end
+
+  defp restore_application_env(app, key, nil), do: Application.delete_env(app, key)
+  defp restore_application_env(app, key, value), do: Application.put_env(app, key, value)
 end

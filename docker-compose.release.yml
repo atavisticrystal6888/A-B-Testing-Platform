@@ -1,0 +1,85 @@
+x-backend-env: &backend-env
+  PHX_SERVER: "true"
+  PORT: "4000"
+  PHX_HOST: ${PHX_HOST:?set PHX_HOST in release.env}
+  DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in release.env}
+  SECRET_KEY_BASE: ${SECRET_KEY_BASE:?set SECRET_KEY_BASE in release.env}
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in release.env}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+  STAT_ENGINE_URL: ${STAT_ENGINE_URL:-http://statistical-engine:8000}
+  STAT_ENGINE_API_KEY: ${STAT_ENGINE_API_KEY:?set STAT_ENGINE_API_KEY in release.env}
+  KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+  KAFKA_GROUP_ID: ${KAFKA_GROUP_ID:-experimenthub-event-collector}
+  KAFKA_TOPICS: ${KAFKA_TOPICS:-experimenthub.events.inbound}
+  POOL_SIZE: ${POOL_SIZE:-10}
+  DB_SSL: ${DB_SSL:-false}
+  DNS_CLUSTER_QUERY: ${DNS_CLUSTER_QUERY:-}
+
+services:
+  statistical-engine:
+    build:
+      context: .
+      dockerfile: statistical_engine/Dockerfile
+      args:
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
+    restart: unless-stopped
+    environment:
+      INTERNAL_API_KEY: ${STAT_ENGINE_API_KEY:?set STAT_ENGINE_API_KEY in release.env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/stats/v1/health')"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  experiment-hub-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.experiment-hub-web
+    restart: unless-stopped
+    environment: *backend-env
+    expose:
+      - "4000"
+    depends_on:
+      statistical-engine:
+        condition: service_healthy
+
+  experiment-hub-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.experiment-hub-web
+    profiles: ["ops"]
+    restart: "no"
+    environment: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      statistical-engine:
+        condition: service_healthy
+    command: ["bin/experiment_hub_web", "eval", "ExperimentHub.Release.migrate()"]
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+      args:
+        VITE_API_URL: ${DASHBOARD_VITE_API_URL:-}
+    restart: unless-stopped
+    depends_on:
+      experiment-hub-web:
+        condition: service_started
+    ports:
+      - "${DASHBOARD_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5

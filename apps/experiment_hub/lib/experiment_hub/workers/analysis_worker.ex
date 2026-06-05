@@ -12,12 +12,6 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
   alias ExperimentHub.Metrics
   alias ExperimentHub.Metrics.StatisticalAnalysis
 
-  @stat_engine_url Application.compile_env(
-                     :experiment_hub,
-                     :stat_engine_url,
-                     "http://localhost:8000"
-                   )
-
   @impl Oban.Worker
   def perform(%Oban.Job{
         args: %{"experiment_id" => experiment_id, "tenant_id" => tenant_id} = args
@@ -166,7 +160,7 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
   defp metric_methodology(_metric_result), do: "z_test_proportions"
 
   defp stat_engine_url do
-    Application.get_env(:experiment_hub, :stat_engine_url, @stat_engine_url)
+    Application.get_env(:experiment_hub, :stat_engine_url, "http://localhost:8000")
   end
 
   defp internal_api_key do

@@ -22,15 +22,24 @@ defmodule ExperimentHubWeb.EventController do
 
     case EventValidator.validate(event) do
       {:ok, validated} ->
-        Producer.produce_event(validated)
+        case Producer.produce_event(validated) do
+          :ok ->
+            conn
+            |> put_status(202)
+            |> json(%{
+              status: "accepted",
+              event_id: Ecto.UUID.generate(),
+              received_at: DateTime.utc_now() |> DateTime.to_iso8601()
+            })
 
-        conn
-        |> put_status(202)
-        |> json(%{
-          status: "accepted",
-          event_id: Ecto.UUID.generate(),
-          received_at: DateTime.utc_now() |> DateTime.to_iso8601()
-        })
+          {:error, reason} ->
+            conn
+            |> put_status(503)
+            |> json(%{
+              error: "service_unavailable",
+              message: "Failed to enqueue event: #{inspect(reason)}"
+            })
+        end
 
       {:error, errors} ->
         conn
@@ -61,34 +70,40 @@ defmodule ExperimentHubWeb.EventController do
 
     {accepted, rejected} = EventValidator.validate_batch(tagged_events)
 
-    # Produce accepted events to Kafka
-    if length(accepted) > 0 do
-      Producer.produce_batch(accepted)
+    case publish_batch(accepted) do
+      :ok ->
+        status_code =
+          cond do
+            length(rejected) == 0 -> 202
+            length(accepted) == 0 -> 400
+            true -> 207
+          end
+
+        status_label =
+          cond do
+            length(rejected) == 0 -> "accepted"
+            length(accepted) == 0 -> "rejected"
+            true -> "partial"
+          end
+
+        conn
+        |> put_status(status_code)
+        |> json(%{
+          status: status_label,
+          accepted: length(accepted),
+          rejected: length(rejected),
+          errors: format_batch_errors(rejected),
+          received_at: DateTime.utc_now() |> DateTime.to_iso8601()
+        })
+
+      {:error, reason} ->
+        conn
+        |> put_status(503)
+        |> json(%{
+          error: "service_unavailable",
+          message: "Failed to enqueue accepted events: #{inspect(reason)}"
+        })
     end
-
-    status_code =
-      cond do
-        length(rejected) == 0 -> 202
-        length(accepted) == 0 -> 400
-        true -> 207
-      end
-
-    status_label =
-      cond do
-        length(rejected) == 0 -> "accepted"
-        length(accepted) == 0 -> "rejected"
-        true -> "partial"
-      end
-
-    conn
-    |> put_status(status_code)
-    |> json(%{
-      status: status_label,
-      accepted: length(accepted),
-      rejected: length(rejected),
-      errors: format_batch_errors(rejected),
-      received_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    })
   end
 
   def batch_create(conn, _params) do
@@ -100,6 +115,9 @@ defmodule ExperimentHubWeb.EventController do
       details: [%{field: "events", error: "is required and must be an array"}]
     })
   end
+
+  defp publish_batch([]), do: :ok
+  defp publish_batch(events), do: Producer.produce_batch(events)
 
   defp format_first_error([%{field: field, error: error} | _]) do
     "#{String.capitalize(String.replace(error, "_", " "))}: #{field}"

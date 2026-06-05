@@ -21,6 +21,7 @@ venv/
 dist/
 .mypy_cache/
 .ruff_cache/
+**/.pytest_cache/
 
 # Node.js / React
 node_modules/
@@ -56,10 +57,21 @@ mix.lock is tracked
 
 # Phoenix
 /apps/experiment_hub_web/priv/static/assets/
+/apps/experiment_hub_web/priv/static/*.gz
+/apps/experiment_hub_web/priv/static/*-[0-9a-f]*.ico
+/apps/experiment_hub_web/priv/static/*-[0-9a-f]*.txt
 
 # Docker volumes (local)
 postgres_data/
 redis_data/
 
+# Local Docker build trust anchors
+/docker/certs/*.crt
+!/docker/certs/.gitkeep
+
 # k6 results
 k6/results/
+
+# Local smoke test outputs
+/tmp/release-smoke/
+/tmp/release-prod-smoke/

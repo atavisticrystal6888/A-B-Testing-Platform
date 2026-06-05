@@ -6,6 +6,7 @@ defmodule ExperimentHubUmbrella.MixProject do
       apps_path: "apps",
       version: "0.1.0",
       start_permanent: Mix.env() == :prod,
+      releases: releases(),
       deps: deps(),
       aliases: aliases()
     ]
@@ -27,6 +28,19 @@ defmodule ExperimentHubUmbrella.MixProject do
   # Run "mix help deps" for examples and options.
   defp deps do
     []
+  end
+
+  defp releases do
+    [
+      experiment_hub_web: [
+        applications: [
+          assignment_engine: :permanent,
+          event_collector: :permanent,
+          experiment_hub: :permanent,
+          experiment_hub_web: :permanent
+        ]
+      ]
+    ]
   end
 
   defp aliases do

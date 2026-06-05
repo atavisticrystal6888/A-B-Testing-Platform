@@ -39,6 +39,7 @@ Recent integration fixes completed:
 ## Documentation
 
 - Full setup, deployment, architecture, features, and usage guide: `docs/setup-deployment-and-user-guide.md`
+- Containerized production release flow: `docker-compose.release.yml` with `release.env.example`
 
 ## Local Development
 

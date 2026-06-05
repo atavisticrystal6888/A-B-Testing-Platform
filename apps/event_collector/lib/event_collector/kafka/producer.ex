@@ -21,7 +21,12 @@ defmodule EventCollector.Kafka.Producer do
   Produce a batch of validated events.
   """
   def produce_batch(events) when is_list(events) do
-    Enum.each(events, &produce_event/1)
+    Enum.reduce_while(events, :ok, fn event, :ok ->
+      case produce_event(event) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
   end
 
   defp produce(topic, key, value) do
@@ -33,5 +38,11 @@ defmodule EventCollector.Kafka.Producer do
       module ->
         module.produce(topic, key, value)
     end
+    |> normalize_result()
   end
+
+  defp normalize_result(:ok), do: :ok
+  defp normalize_result({:ok, _metadata}), do: :ok
+  defp normalize_result({:error, _reason} = error), do: error
+  defp normalize_result(other), do: {:error, {:unexpected_result, other}}
 end

@@ -23,6 +23,37 @@ end
 config :experiment_hub_web, ExperimentHubWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+required_env! = fn name, example ->
+  System.get_env(name) ||
+    raise """
+    environment variable #{name} is missing.
+    #{example}
+    """
+end
+
+csv_env = fn value ->
+  value
+  |> String.split(",", trim: true)
+  |> Enum.map(&String.trim/1)
+end
+
+parse_kafka_brokers = fn value ->
+  value
+  |> csv_env.()
+  |> Enum.map(fn broker ->
+    case String.split(broker, ":", parts: 2) do
+      [host, port] when host != "" ->
+        {host, String.to_integer(port)}
+
+      _ ->
+        raise """
+        environment variable KAFKA_BROKERS must be a comma-separated HOST:PORT list.
+        For example: kafka-1.internal:9092,kafka-2.internal:9092
+        """
+    end
+  end)
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||
@@ -48,7 +79,46 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
+  redis_url =
+    required_env!.(
+      "REDIS_URL",
+      "For example: redis://redis.internal:6379"
+    )
+
+  stat_engine_url =
+    required_env!.(
+      "STAT_ENGINE_URL",
+      "For example: http://stats.internal:8000"
+    )
+
+  stat_engine_api_key =
+    required_env!.(
+      "STAT_ENGINE_API_KEY",
+      "It must match the INTERNAL_API_KEY configured on the statistical engine."
+    )
+
+  kafka_brokers =
+    required_env!.(
+      "KAFKA_BROKERS",
+      "For example: kafka-1.internal:9092,kafka-2.internal:9092"
+    )
+    |> parse_kafka_brokers.()
+
+  kafka_topics =
+    System.get_env("KAFKA_TOPICS", "experimenthub.events.inbound")
+    |> csv_env.()
+
   host = System.get_env("PHX_HOST") || "example.com"
+
+  config :experiment_hub,
+    redis_url: redis_url,
+    stat_engine_url: stat_engine_url,
+    stat_engine_api_key: stat_engine_api_key
+
+  config :event_collector, EventCollector.Broadway.EventPipeline,
+    kafka_brokers: kafka_brokers,
+    kafka_group_id: System.get_env("KAFKA_GROUP_ID", "experimenthub-event-collector"),
+    kafka_topics: kafka_topics
 
   config :experiment_hub_web, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
