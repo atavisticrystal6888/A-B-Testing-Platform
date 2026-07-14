@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import type { Experiment, ExperimentListResponse } from "../lib/types";
+import type { ConclusionDecision, Experiment, ExperimentListResponse } from "../lib/types";
 
 type CreateExperimentResponse = Experiment & {
   warnings?: unknown[];
@@ -106,6 +106,31 @@ export function useExperimentAction(action: string) {
       queryClient.invalidateQueries({ queryKey: ["experiments"] });
       queryClient.invalidateQueries({ queryKey: ["experiment", id] });
       queryClient.invalidateQueries({ queryKey: ["results", id] });
+    },
+  });
+}
+
+export interface ConcludeExperimentInput {
+  id: string;
+  decision: ConclusionDecision;
+  rationale: string;
+  winner_variant_id?: string;
+}
+
+export function useConcludeExperiment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, decision, rationale, winner_variant_id }: ConcludeExperimentInput) =>
+      api.post(`/api/v1/experiments/${id}/conclude`, {
+        decision,
+        rationale,
+        winner_variant_id,
+      }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["experiments"] });
+      queryClient.invalidateQueries({ queryKey: ["experiment", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["results", variables.id] });
     },
   });
 }

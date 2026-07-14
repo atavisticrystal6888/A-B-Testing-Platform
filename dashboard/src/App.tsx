@@ -22,6 +22,9 @@ const AuditLogPage = lazy(() =>
   import("./pages/AuditLogPage").then((module) => ({ default: module.AuditLogPage })),
 );
 const MetricDefinitionsPage = lazy(() => import("./pages/MetricDefinitionsPage.tsx"));
+const AdminSettingsPage = lazy(() =>
+  import("./pages/AdminSettingsPage").then((module) => ({ default: module.AdminSettingsPage })),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -72,6 +75,7 @@ export default function App() {
                       <Route path="/flags" element={<FeatureFlagsPage />} />
                       <Route path="/metrics" element={<MetricDefinitionsPage />} />
                       <Route path="/audit-logs" element={<AuditLogPage />} />
+                      <Route path="/settings" element={<AdminSettingsPage />} />
                     </Route>
                   </Route>
                 </Routes>

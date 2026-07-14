@@ -12,6 +12,20 @@ export interface User {
   email: string;
   role: "viewer" | "editor" | "admin";
   tenant_id: string;
+  inserted_at?: string;
+  updated_at?: string;
+}
+
+export interface ApiKey {
+  id: string;
+  key_prefix: string;
+  prefix?: string;
+  key?: string;
+  name: string;
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  last_used_at?: string | null;
+  inserted_at: string;
 }
 
 export interface AuthTokens {
@@ -70,6 +84,7 @@ export interface Experiment {
   scheduled_end_at?: string;
   started_at?: string;
   concluded_at?: string;
+  winner_variant_id?: string;
   version: number;
   archived: boolean;
   variants: Variant[];

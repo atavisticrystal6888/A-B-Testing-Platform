@@ -1,12 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { useExperiment, useExperimentAction } from "../hooks/useExperiments";
+import { useConcludeExperiment, useExperiment, useExperimentAction } from "../hooks/useExperiments";
 import { useExperimentResults } from "../hooks/useResults";
 import { useWebSocket } from "../contexts/WebSocketContext";
 import ConfidenceIntervalChart from "../components/charts/ConfidenceIntervalChart";
 import ConversionOverTimeChart from "../components/charts/ConversionOverTimeChart";
-import type { Experiment, AnalysisResults, MetricResult } from "../lib/types";
+import { ConcludeModal } from "../components/experiments/ConcludeModal";
+import type { AnalysisResults, ConclusionDecision, Experiment, MetricResult } from "../lib/types";
 
 function VariantTable({ experiment, results }: { experiment: Experiment; results?: AnalysisResults }) {
   const primaryMetric = results?.metrics.find((m) => m.role === "primary");
@@ -115,6 +116,7 @@ function SignificanceCard({ metric }: { metric: MetricResult }) {
 
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [isConcludeModalOpen, setIsConcludeModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const { subscribeToExperiment } = useWebSocket();
   const { data: experiment, isLoading: expLoading, error: expError } = useExperiment(id!);
@@ -123,6 +125,7 @@ export default function ExperimentDetailPage() {
   const analyzeAction = useExperimentAction("analyze");
   const pauseAction = useExperimentAction("pause");
   const resumeAction = useExperimentAction("resume");
+  const concludeAction = useConcludeExperiment();
 
   useEffect(() => {
     if (!id) return;
@@ -145,6 +148,21 @@ export default function ExperimentDetailPage() {
   const analysisMessage = experiment.status === "draft"
     ? "Start the experiment to automatically queue the first analysis run when the analysis stack is available."
     : "Results will appear here automatically after the queued analysis run completes.";
+  const canConclude = experiment.status === "running" || experiment.status === "paused";
+
+  const handleConclude = (decision: ConclusionDecision, rationale: string, winnerVariantId?: string) => {
+    concludeAction.mutate(
+      {
+        id: id!,
+        decision,
+        rationale,
+        winner_variant_id: winnerVariantId,
+      },
+      {
+        onSuccess: () => setIsConcludeModalOpen(false),
+      },
+    );
+  };
 
   return (
     <div className="p-8 max-w-6xl">
@@ -185,8 +203,28 @@ export default function ExperimentDetailPage() {
               {resumeAction.isPending ? "Resuming..." : "Resume"}
             </button>
           )}
+          {canConclude && (
+            <button
+              onClick={() => setIsConcludeModalOpen(true)}
+              disabled={concludeAction.isPending}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:bg-red-500"
+            >
+              Conclude
+            </button>
+          )}
         </div>
       </div>
+
+      {isConcludeModalOpen && (
+        <ConcludeModal
+          experimentName={experiment.name}
+          variants={experiment.variants}
+          isPending={concludeAction.isPending}
+          errorMessage={concludeAction.isError ? "Unable to conclude the experiment right now." : undefined}
+          onConfirm={handleConclude}
+          onCancel={() => setIsConcludeModalOpen(false)}
+        />
+      )}
 
       {/* Stats Cards */}
       {primaryMetric && <SignificanceCard metric={primaryMetric} />}

@@ -165,6 +165,7 @@ defmodule ExperimentHubWeb.ExperimentController do
         attrs = %{
           "conclusion_decision" => params["decision"],
           "conclusion_rationale" => params["rationale"],
+          "winner_variant_id" => params["winner_variant_id"],
           "concluded_by" => conn.assigns[:current_user_id]
         }
 

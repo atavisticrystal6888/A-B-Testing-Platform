@@ -9,6 +9,8 @@ const navItems = [
   { path: "/audit-logs", label: "Audit Log", icon: "🧾" },
 ];
 
+const adminNavItems = [{ path: "/settings", label: "Settings", icon: "⚙️" }];
+
 export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -23,7 +25,7 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => {
+          {[...navItems, ...(user?.role === "admin" ? adminNavItems : [])].map((item) => {
             const isActive = location.pathname.startsWith(item.path);
             return (
               <Link

@@ -1,21 +1,16 @@
-import { useState } from 'react';
-
-interface ApiKey {
-  id: string;
-  prefix: string;
-  name: string;
-  last_used_at?: string;
-  inserted_at: string;
-}
+import { useState } from "react";
+import type { ApiKey } from "../../lib/types";
 
 interface ApiKeyManagerProps {
   apiKeys: ApiKey[];
+  isLoading?: boolean;
+  errorMessage?: string;
   onGenerate: (name: string) => Promise<{ key: string }>;
-  onRevoke: (id: string) => void;
+  onRevoke: (id: string) => void | Promise<void>;
 }
 
-export function ApiKeyManager({ apiKeys, onGenerate, onRevoke }: ApiKeyManagerProps) {
-  const [newKeyName, setNewKeyName] = useState('');
+export function ApiKeyManager({ apiKeys, isLoading = false, errorMessage, onGenerate, onRevoke }: ApiKeyManagerProps) {
+  const [newKeyName, setNewKeyName] = useState("");
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
 
@@ -25,7 +20,7 @@ export function ApiKeyManager({ apiKeys, onGenerate, onRevoke }: ApiKeyManagerPr
     try {
       const result = await onGenerate(newKeyName);
       setGeneratedKey(result.key);
-      setNewKeyName('');
+      setNewKeyName("");
     } finally {
       setGenerating(false);
     }
@@ -73,6 +68,12 @@ export function ApiKeyManager({ apiKeys, onGenerate, onRevoke }: ApiKeyManagerPr
         </div>
       )}
 
+      {errorMessage && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errorMessage}
+        </div>
+      )}
+
       <div className="rounded-xl border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -84,16 +85,45 @@ export function ApiKeyManager({ apiKeys, onGenerate, onRevoke }: ApiKeyManagerPr
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {apiKeys.map((key) => (
-              <tr key={key.id}>
-                <td className="px-6 py-3 text-sm text-gray-900">{key.name}</td>
-                <td className="px-6 py-3 text-sm text-gray-500 font-mono">{key.prefix}...</td>
-                <td className="px-6 py-3 text-sm text-gray-500">{new Date(key.inserted_at).toLocaleDateString()}</td>
-                <td className="px-6 py-3 text-right">
-                  <button onClick={() => onRevoke(key.id)} className="text-sm text-red-600 hover:text-red-700">Revoke</button>
+            {isLoading ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500">
+                  Loading API keys...
                 </td>
               </tr>
-            ))}
+            ) : apiKeys.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500">
+                  No API keys have been generated yet.
+                </td>
+              </tr>
+            ) : (
+              apiKeys.map((key) => {
+                const prefix = key.prefix ?? key.key_prefix;
+
+                return (
+                  <tr key={key.id}>
+                    <td className="px-6 py-3 text-sm text-gray-900">
+                      <div className="font-medium">{key.name}</div>
+                      {key.revoked_at && <div className="text-xs text-red-600">Revoked</div>}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-gray-500 font-mono">{prefix}...</td>
+                    <td className="px-6 py-3 text-sm text-gray-500">
+                      {new Date(key.inserted_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-3 text-right">
+                      <button
+                        onClick={() => onRevoke(key.id)}
+                        disabled={Boolean(key.revoked_at)}
+                        className="text-sm text-red-600 hover:text-red-700 disabled:cursor-not-allowed disabled:text-gray-400"
+                      >
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>

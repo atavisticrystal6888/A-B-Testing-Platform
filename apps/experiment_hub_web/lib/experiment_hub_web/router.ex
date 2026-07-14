@@ -122,6 +122,18 @@ defmodule ExperimentHubWeb.Router do
   scope "/api/v1", ExperimentHubWeb do
     pipe_through [:api, :api_authenticated, :require_admin]
 
+    # API key management
+    get "/api-keys", ApiKeyController, :index
+    post "/api-keys", ApiKeyController, :create
+    delete "/api-keys/:id", ApiKeyController, :delete
+
+    # User management
+    get "/users", UserController, :index
+    post "/users", UserController, :create
+    get "/users/:id", UserController, :show
+    put "/users/:id", UserController, :update
+    delete "/users/:id", UserController, :delete
+
     delete "/metric-definitions/:id", MetricDefinitionController, :delete
     delete "/flags/:id", FeatureFlagController, :delete
 

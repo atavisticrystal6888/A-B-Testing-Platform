@@ -28,6 +28,7 @@ defmodule ExperimentHubWeb.ExperimentJSON do
       started_at: experiment.started_at,
       concluded_at: experiment.concluded_at,
       conclusion_decision: experiment.conclusion_decision,
+      winner_variant_id: experiment.winner_variant_id,
       version: experiment.version
     }
   end
@@ -59,6 +60,7 @@ defmodule ExperimentHubWeb.ExperimentJSON do
       experiment_group_id: experiment.experiment_group_id,
       conclusion_decision: experiment.conclusion_decision,
       conclusion_rationale: experiment.conclusion_rationale,
+      winner_variant_id: experiment.winner_variant_id,
       scheduled_start_at: experiment.scheduled_start_at,
       scheduled_end_at: experiment.scheduled_end_at,
       started_at: experiment.started_at,

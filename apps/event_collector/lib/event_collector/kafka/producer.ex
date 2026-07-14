@@ -5,6 +5,8 @@ defmodule EventCollector.Kafka.Producer do
 
   require Logger
 
+  alias EventCollector.Buffer.DiskBuffer
+
   @topic "experimenthub.events.raw"
 
   @doc """
@@ -30,15 +32,46 @@ defmodule EventCollector.Kafka.Producer do
   end
 
   defp produce(topic, key, value) do
-    case Application.get_env(:event_collector, :kafka_producer) do
-      nil ->
-        # Try the Kafka client directly
-        EventCollector.Kafka.Client.produce(topic, key, value)
+    result =
+      case Application.get_env(:event_collector, :kafka_producer) do
+        nil ->
+          produce_or_buffer(topic, key, value)
 
-      module ->
-        module.produce(topic, key, value)
+        module ->
+          module.produce(topic, key, value)
+      end
+
+    normalize_result(result)
+  end
+
+  defp produce_or_buffer(topic, key, value) do
+    case EventCollector.Kafka.Client.produce(topic, key, value) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        buffer_event(topic, key, value, reason)
+
+      other ->
+        other
     end
-    |> normalize_result()
+  end
+
+  defp buffer_event(topic, key, value, producer_error) do
+    with pid when is_pid(pid) <- Process.whereis(DiskBuffer),
+         {:ok, event} <- Jason.decode(value),
+         :ok <-
+           DiskBuffer.buffer_event(
+             event
+             |> Map.put("_event_collector_topic", topic)
+             |> Map.put("_event_collector_partition_key", key)
+           ) do
+      Logger.warning("Kafka unavailable; buffered event on disk: #{inspect(producer_error)}")
+      :ok
+    else
+      nil -> {:error, producer_error}
+      {:error, _reason} = error -> error
+    end
   end
 
   defp normalize_result(:ok), do: :ok

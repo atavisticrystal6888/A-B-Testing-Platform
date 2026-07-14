@@ -7,10 +7,11 @@ import Config
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
 config :experiment_hub, ExperimentHub.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  database: "experiment_hub_dev",
+  username: System.get_env("DB_USERNAME", "experimenthub"),
+  password: System.get_env("DB_PASSWORD", "experimenthub_dev"),
+  hostname: System.get_env("DB_HOST", "localhost"),
+  port: String.to_integer(System.get_env("DB_PORT", "5432")),
+  database: System.get_env("DB_NAME", "experiment_hub_dev"),
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10

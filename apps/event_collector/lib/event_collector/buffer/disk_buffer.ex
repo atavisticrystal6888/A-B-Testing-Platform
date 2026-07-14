@@ -112,10 +112,11 @@ defmodule EventCollector.Buffer.DiskBuffer do
   end
 
   defp send_to_kafka(event) do
-    topic = Map.get(event, "topic", "experimenthub.events.raw")
+    {topic, event} = Map.pop(event, "_event_collector_topic", "experimenthub.events.raw")
+    {partition_key, event} = Map.pop(event, "_event_collector_partition_key", "")
     encoded = Jason.encode!(event)
 
-    case EventCollector.Kafka.Client.produce(topic, "", encoded) do
+    case EventCollector.Kafka.Client.produce(topic, partition_key, encoded) do
       :ok -> :ok
       {:error, _} = error -> error
       _ -> {:error, :kafka_unavailable}

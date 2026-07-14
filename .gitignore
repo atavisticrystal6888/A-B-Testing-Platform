@@ -75,3 +75,4 @@ k6/results/
 # Local smoke test outputs
 /tmp/release-smoke/
 /tmp/release-prod-smoke/
+/tmp/event_buffer/

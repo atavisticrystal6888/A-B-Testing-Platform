@@ -9,16 +9,7 @@ defmodule ExperimentHubWeb.ApiKeyController do
     api_keys = Tenants.list_api_keys(tenant_id)
 
     json(conn, %{
-      data:
-        Enum.map(api_keys, fn key ->
-          %{
-            id: key.id,
-            prefix: key.prefix,
-            name: key.name,
-            last_used_at: key.last_used_at,
-            inserted_at: key.inserted_at
-          }
-        end)
+      data: Enum.map(api_keys, &format_api_key/1)
     })
   end
 
@@ -26,19 +17,18 @@ defmodule ExperimentHubWeb.ApiKeyController do
     tenant_id = conn.assigns[:tenant_id]
     name = params["name"] || "default"
 
-    attrs = %{"name" => name, "tenant_id" => tenant_id}
+    attrs =
+      params
+      |> Map.take(["expires_at"])
+      |> Map.put("name", name)
+      |> Map.put("tenant_id", tenant_id)
 
     case Tenants.create_api_key(attrs) do
       {:ok, api_key} ->
         conn
         |> put_status(:created)
         |> json(%{
-          data: %{
-            id: api_key.id,
-            key: Map.get(api_key, :raw_key),
-            prefix: api_key.prefix,
-            name: api_key.name
-          },
+          data: Map.put(format_api_key(api_key), :key, Map.get(api_key, :raw_key)),
           message: "Store this key securely. It will not be shown again."
         })
 
@@ -51,5 +41,18 @@ defmodule ExperimentHubWeb.ApiKeyController do
     api_key = Tenants.get_api_key!(id)
     Tenants.revoke_api_key(api_key)
     send_resp(conn, :no_content, "")
+  end
+
+  defp format_api_key(api_key) do
+    %{
+      id: api_key.id,
+      key_prefix: api_key.key_prefix,
+      prefix: api_key.key_prefix,
+      name: api_key.name,
+      expires_at: api_key.expires_at,
+      revoked_at: api_key.revoked_at,
+      last_used_at: api_key.last_used_at,
+      inserted_at: api_key.inserted_at
+    }
   end
 end

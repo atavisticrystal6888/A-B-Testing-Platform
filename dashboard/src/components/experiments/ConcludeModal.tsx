@@ -1,21 +1,34 @@
-import { useState } from 'react';
+import { useState } from "react";
+import type { ConclusionDecision, Variant } from "../../lib/types";
 
 interface ConcludeModalProps {
   experimentName: string;
-  onConfirm: (decision: string, rationale: string, winnerVariantId?: string) => void;
+  variants: Variant[];
+  isPending?: boolean;
+  errorMessage?: string;
+  onConfirm: (decision: ConclusionDecision, rationale: string, winnerVariantId?: string) => void;
   onCancel: () => void;
 }
 
-export function ConcludeModal({ experimentName, onConfirm, onCancel }: ConcludeModalProps) {
-  const [decision, setDecision] = useState('');
-  const [rationale, setRationale] = useState('');
-  const [winnerVariantId, setWinnerVariantId] = useState('');
+export function ConcludeModal({
+  experimentName,
+  variants,
+  isPending = false,
+  errorMessage,
+  onConfirm,
+  onCancel,
+}: ConcludeModalProps) {
+  const [decision, setDecision] = useState<ConclusionDecision | "">("");
+  const [rationale, setRationale] = useState("");
+  const [winnerVariantId, setWinnerVariantId] = useState("");
 
   const decisions = [
-    { value: 'ship_variant', label: 'Ship Variant', description: 'Roll out the winning variant to all users' },
-    { value: 'revert', label: 'Revert to Control', description: 'Keep the current control experience' },
-    { value: 'inconclusive', label: 'Inconclusive', description: 'Results are not statistically significant' },
-  ];
+    { value: "ship_variant", label: "Ship Variant", description: "Roll out the winning variant to all users" },
+    { value: "revert_to_control", label: "Revert to Control", description: "Keep the current control experience" },
+    { value: "inconclusive", label: "Inconclusive", description: "Results are not statistically significant" },
+  ] satisfies Array<{ value: ConclusionDecision; label: string; description: string }>;
+
+  const canConfirm = Boolean(decision && rationale.trim() && (decision !== "ship_variant" || winnerVariantId));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -43,7 +56,7 @@ export function ConcludeModal({ experimentName, onConfirm, onCancel }: ConcludeM
                     name="decision"
                     value={d.value}
                     checked={decision === d.value}
-                    onChange={(e) => setDecision(e.target.value)}
+                    onChange={(e) => setDecision(e.target.value as ConclusionDecision)}
                     className="mt-0.5 mr-3"
                   />
                   <div>
@@ -55,18 +68,23 @@ export function ConcludeModal({ experimentName, onConfirm, onCancel }: ConcludeM
             </div>
           </div>
 
-          {decision === 'ship_variant' && (
+          {decision === "ship_variant" && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Winner Variant ID
+                Winning Variant
               </label>
-              <input
-                type="text"
+              <select
                 value={winnerVariantId}
                 onChange={(e) => setWinnerVariantId(e.target.value)}
-                placeholder="Enter variant ID"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
+              >
+                <option value="">Select a variant</option>
+                {variants.map((variant) => (
+                  <option key={variant.id} value={variant.id}>
+                    {variant.name} ({variant.key})
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -80,6 +98,12 @@ export function ConcludeModal({ experimentName, onConfirm, onCancel }: ConcludeM
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
+
+          {errorMessage && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {errorMessage}
+            </p>
+          )}
         </div>
 
         <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
@@ -90,11 +114,11 @@ export function ConcludeModal({ experimentName, onConfirm, onCancel }: ConcludeM
             Cancel
           </button>
           <button
-            onClick={() => onConfirm(decision, rationale, winnerVariantId || undefined)}
-            disabled={!decision || !rationale}
+            onClick={() => decision && onConfirm(decision, rationale, winnerVariantId || undefined)}
+            disabled={!canConfirm || isPending}
             className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            Confirm
+            {isPending ? "Concluding..." : "Confirm"}
           </button>
         </div>
       </div>

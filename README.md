@@ -87,7 +87,22 @@ To recreate that account against an existing dev database:
 mix dev.bootstrap
 ```
 
-### 4) Start application services
+### 4) Seed the complete local demo
+
+Populate representative users, API keys, feature flags, experiment groups, lifecycle states,
+assignments, events, daily rollups, analyses, and audit history with:
+
+```powershell
+mix dev.demo
+```
+
+The command prints a fresh one-time SDK API key. Use it to run the repeatable API workflow:
+
+```powershell
+.\scripts\demo-e2e.ps1 -ApiKey "<SDK API key printed by mix dev.demo>"
+```
+
+### 5) Start application services
 
 Phoenix now starts Oban normally once the database is migrated, so queued experiment analysis works in a regular dev boot.
 
