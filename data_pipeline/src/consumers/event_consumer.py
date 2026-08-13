@@ -1,4 +1,8 @@
-"""Kafka consumer for experimenthub.events.raw topic.
+"""Kafka consumer for the event_collector's validated events topic (default
+experimenthub.events.raw, override via KAFKA_EVENT_TOPIC). This is the
+post-validation, deduplicated topic that event_collector's Broadway pipeline
+produces to after consuming from experimenthub.events.inbound — do not point
+this at events.inbound, which is unvalidated and undeduplicated.
 Consumes raw events and feeds them to the daily rollup aggregator.
 
 The consumer owns a single DailyRollupAggregator (injectable for tests) and
@@ -32,7 +36,7 @@ class EventConsumer:
         self,
         bootstrap_servers: str | None = None,
         group_id: str = "experimenthub-data-pipeline",
-        topic: str = "experimenthub.events.raw",
+        topic: str | None = None,
         aggregator: DailyRollupAggregator | None = None,
         consumer: Any = None,
         flush_max_events: int | None = None,
@@ -42,7 +46,7 @@ class EventConsumer:
             "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"
         )
         self.group_id = group_id
-        self.topic = topic
+        self.topic = topic or os.getenv("KAFKA_EVENT_TOPIC", "experimenthub.events.raw")
         self.aggregator = aggregator if aggregator is not None else DailyRollupAggregator()
         self.flush_max_events = (
             flush_max_events

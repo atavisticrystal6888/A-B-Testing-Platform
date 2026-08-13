@@ -7,7 +7,7 @@ ARG DEBIAN_VERSION=bookworm-20250520
 FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION} AS build
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential git pkg-config ca-certificates && \
+    apt-get install -y --no-install-recommends build-essential cmake git pkg-config ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 COPY docker/certs/ /usr/local/share/ca-certificates/

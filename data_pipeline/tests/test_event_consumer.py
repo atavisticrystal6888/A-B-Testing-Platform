@@ -109,7 +109,8 @@ def test_stop_performs_final_flush_and_closes_kafka_consumer():
     assert fake_kafka.closed is True
 
 
-def test_poll_loop_flushes_on_time_interval_and_survives_bad_json():
+def test_poll_loop_flushes_on_time_interval_and_survives_bad_json(monkeypatch):
+    monkeypatch.delenv("KAFKA_EVENT_TOPIC", raising=False)
     aggregator = RecordingAggregator()
     messages = [
         FakeMessage(json.dumps(_event(user_id="user-1")).encode("utf-8")),
@@ -151,3 +152,19 @@ def test_flush_threshold_defaults():
 
     assert consumer.flush_max_events == 500
     assert consumer.flush_interval_seconds == 10.0
+
+
+def test_topic_defaults_to_validated_events_raw(monkeypatch):
+    monkeypatch.delenv("KAFKA_EVENT_TOPIC", raising=False)
+
+    consumer = EventConsumer(aggregator=RecordingAggregator())
+
+    assert consumer.topic == "experimenthub.events.raw"
+
+
+def test_topic_is_env_configurable(monkeypatch):
+    monkeypatch.setenv("KAFKA_EVENT_TOPIC", "some.other.topic")
+
+    consumer = EventConsumer(aggregator=RecordingAggregator())
+
+    assert consumer.topic == "some.other.topic"

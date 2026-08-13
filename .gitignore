@@ -43,6 +43,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+release.env
 
 # Logs
 *.log
