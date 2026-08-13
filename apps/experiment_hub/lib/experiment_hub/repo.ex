@@ -46,7 +46,12 @@ defmodule ExperimentHub.Repo do
 
   defp maybe_scope_query(%Ecto.Query{} = query) do
     case {current_tenant_id(), tenant_scoped_schema(query)} do
-      {tenant_id, schema} when is_binary(tenant_id) and is_atom(schema) ->
+      # tenant_scoped_schema/1 returns nil for schemas with no :tenant_id
+      # field (e.g. Oban.Job) — and is_atom(nil) is true, so this guard
+      # must exclude nil explicitly or every query on a non-tenant schema
+      # gets a `where tenant_id == ...` injected and blows up with an
+      # undefined-column error the moment any tenant context is active.
+      {tenant_id, schema} when is_binary(tenant_id) and is_atom(schema) and not is_nil(schema) ->
         where(query, [record], field(record, :tenant_id) == ^tenant_id)
 
       _ ->

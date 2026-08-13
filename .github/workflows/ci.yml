@@ -132,3 +132,78 @@ jobs:
         run: docker build -f Dockerfile.experiment-hub-web .
       - name: Build dashboard image
         run: docker build -f dashboard/Dockerfile .
+
+  release-smoke-test:
+    name: Release stack smoke test
+    runs-on: ubuntu-latest
+    needs: [docker-builds]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      # Ephemeral, CI-only secrets — this stack is torn down at the end of
+      # the job. Never reuse these values for a real deployment.
+      - name: Generate ephemeral release.env
+        run: |
+          cat > release.env <<EOF
+          PHX_HOST=localhost
+          DATABASE_URL=ecto://experimenthub:experimenthub_dev@postgres/experiment_hub_dev
+          SECRET_KEY_BASE=$(openssl rand -base64 64 | tr -d '\n')
+          JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')
+          REDIS_URL=redis://redis:6379
+          STAT_ENGINE_URL=http://statistical-engine:8000
+          STAT_ENGINE_API_KEY=$(openssl rand -hex 32)
+          KAFKA_BROKERS=kafka:29092
+          KAFKA_GROUP_ID=experimenthub-event-collector
+          KAFKA_TOPICS=experimenthub.events.inbound
+          KAFKA_CONSUMER_ENABLED=true
+          PIPELINE_DATABASE_URL=postgresql://experimenthub:experimenthub_dev@postgres:5432/experiment_hub_dev
+          KAFKA_EVENT_TOPIC=experimenthub.events.raw
+          ROLLUP_FLUSH_MAX_EVENTS=500
+          ROLLUP_FLUSH_INTERVAL_SECONDS=10
+          POOL_SIZE=10
+          DB_SSL=false
+          DNS_CLUSTER_QUERY=
+          POSTGRES_PORT=15432
+          DASHBOARD_PORT=8080
+          CORS_ORIGINS=http://localhost:8080
+          DASHBOARD_APP_API_URL=
+          DASHBOARD_VITE_API_URL=
+          EOF
+
+      - name: Build release images
+        run: docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml build
+
+      - name: Start infrastructure
+        run: docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml up -d postgres kafka redis
+
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format='{{.State.Health.Status}}' experimenthub-postgres 2>/dev/null || echo starting)
+            if [ "$status" = "healthy" ]; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::Postgres never became healthy" && exit 1
+
+      - name: Run release migrations
+        run: docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml --profile ops run --rm experiment-hub-migrate
+
+      - name: Start full stack
+        run: docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml up -d
+
+      - name: Wait for dashboard health endpoint
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8080/health | grep -q '"status":"ok"'; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::Dashboard /health never returned ok" && exit 1
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml logs --tail=200
+
+      - name: Tear down
+        if: always()
+        run: docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml down -v

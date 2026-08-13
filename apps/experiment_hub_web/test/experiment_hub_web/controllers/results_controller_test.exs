@@ -1,5 +1,6 @@
 defmodule ExperimentHubWeb.ResultsControllerTest do
   use ExperimentHubWeb.ConnCase, async: true
+  use Oban.Testing, repo: ExperimentHub.Repo
 
   alias ExperimentHub.{Metrics, Repo}
   alias ExperimentHub.Metrics.StatisticalAnalysis
@@ -184,10 +185,29 @@ defmodule ExperimentHubWeb.ResultsControllerTest do
   end
 
   describe "POST /api/v1/experiments/:experiment_id/analyze" do
-    test "returns service unavailable when analysis queue is disabled", %{
+    test "schedules an analysis run when the queue is available", %{conn: conn, tenant: tenant} do
+      experiment = experiment_fixture(tenant: tenant)
+
+      conn = post(conn, "/api/v1/experiments/#{experiment.id}/analyze")
+      response = json_response(conn, 202)
+
+      assert response["status"] == "accepted"
+
+      assert_enqueued(
+        worker: ExperimentHub.Workers.AnalysisWorker,
+        args: %{"experiment_id" => experiment.id}
+      )
+    end
+
+    test "returns service unavailable when the analysis queue is disabled", %{
       conn: conn,
       tenant: tenant
     } do
+      # schedule_analysis/1 reads this at call time, not boot time, so it's
+      # safe to flip per-test rather than needing a separate global config.
+      Application.put_env(:experiment_hub, :start_oban, false)
+      on_exit(fn -> Application.put_env(:experiment_hub, :start_oban, true) end)
+
       experiment = experiment_fixture(tenant: tenant)
 
       conn = post(conn, "/api/v1/experiments/#{experiment.id}/analyze")

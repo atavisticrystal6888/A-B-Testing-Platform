@@ -20,6 +20,72 @@ defmodule ExperimentHub.Release do
       Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :down, to: version))
   end
 
+  @doc """
+  Creates the first tenant, admin user, and SDK API key on a fresh
+  deployment — the release-safe equivalent of the ad hoc console commands
+  this used to require. Refuses to run if any tenant already exists, so
+  it's safe to invoke more than once. Starts only the repo (not the full
+  supervision tree), same as migrate/0, so it works via `bin/APP eval`
+  without the release already running.
+
+  Usage against a running release container:
+
+      bin/experiment_hub_web eval \\
+        'ExperimentHub.Release.bootstrap_first_tenant("Acme Corp", "acme", "admin@acme.example", "ChangeMe123!")'
+  """
+  def bootstrap_first_tenant(tenant_name, tenant_slug, admin_email, admin_password) do
+    load_app()
+
+    [repo | _] = repos()
+
+    {:ok, result, _} =
+      Ecto.Migrator.with_repo(repo, fn _repo ->
+        do_bootstrap_first_tenant(tenant_name, tenant_slug, admin_email, admin_password)
+      end)
+
+    result
+  end
+
+  defp do_bootstrap_first_tenant(tenant_name, tenant_slug, admin_email, admin_password) do
+    case ExperimentHub.Tenants.list_tenants() do
+      [] ->
+        with {:ok, tenant} <-
+               ExperimentHub.Tenants.create_tenant(%{
+                 "name" => tenant_name,
+                 "slug" => tenant_slug
+               }),
+             {:ok, user} <-
+               ExperimentHub.Tenants.create_user(%{
+                 "tenant_id" => tenant.id,
+                 "email" => admin_email,
+                 "password" => admin_password,
+                 "role" => "admin"
+               }),
+             {:ok, api_key} <-
+               ExperimentHub.Tenants.create_api_key(%{
+                 "tenant_id" => tenant.id,
+                 "name" => "Bootstrap SDK Key"
+               }) do
+          IO.puts("Created tenant #{tenant.slug} (#{tenant.id})")
+          IO.puts("Created admin user #{user.email}")
+          IO.puts("SDK API key (save this now, it is only shown once): #{api_key.raw_key}")
+          {:ok, %{tenant: tenant, user: user, api_key: api_key}}
+        else
+          {:error, changeset} ->
+            IO.puts("Bootstrap failed: #{inspect(changeset.errors)}")
+            {:error, changeset}
+        end
+
+      existing ->
+        IO.puts(
+          "Refusing to bootstrap: #{length(existing)} tenant(s) already exist. " <>
+            "Create additional tenants from the console instead."
+        )
+
+        {:error, :tenants_already_exist}
+    end
+  end
+
   defp load_app do
     Application.load(@app)
   end

@@ -8,6 +8,7 @@ x-backend-env: &backend-env
   REDIS_URL: ${REDIS_URL:-redis://redis:6379}
   STAT_ENGINE_URL: ${STAT_ENGINE_URL:-http://statistical-engine:8000}
   STAT_ENGINE_API_KEY: ${STAT_ENGINE_API_KEY:?set STAT_ENGINE_API_KEY in release.env}
+  ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
   KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:29092}
   KAFKA_GROUP_ID: ${KAFKA_GROUP_ID:-experimenthub-event-collector}
   KAFKA_TOPICS: ${KAFKA_TOPICS:-experimenthub.events.inbound}

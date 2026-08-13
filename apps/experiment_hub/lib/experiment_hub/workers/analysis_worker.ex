@@ -11,6 +11,8 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
   alias ExperimentHub.Experiments
   alias ExperimentHub.Metrics
   alias ExperimentHub.Metrics.StatisticalAnalysis
+  alias ExperimentHub.Notifications
+  alias ExperimentHub.Workers.GuardrailWorker
 
   @impl Oban.Worker
   def perform(%Oban.Job{
@@ -93,29 +95,31 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
 
   defp store_results(body, experiment, tenant_id, metrics) do
     Enum.each(body["metrics"] || [], fn metric_result ->
-      case find_metric_id(metric_result["metric_key"], metrics) do
+      case find_experiment_metric(metric_result["metric_key"], metrics) do
         nil ->
           Logger.warning(
             "Analysis worker: metric #{inspect(metric_result["metric_key"])} is not attached to experiment #{experiment.id}"
           )
 
-        metric_definition_id ->
+        experiment_metric ->
+          is_significant = get_in(metric_result, ["frequentist", "is_significant"])
+
           case %StatisticalAnalysis{}
                |> StatisticalAnalysis.changeset(%{
                  tenant_id: tenant_id,
                  experiment_id: experiment.id,
-                 metric_definition_id: metric_definition_id,
+                 metric_definition_id: experiment_metric.metric_definition_id,
                  analysis_type: metric_analysis_type(metric_result),
                  methodology: metric_methodology(metric_result),
                  parameters: %{significance_level: 0.05},
                  results: metric_result,
                  sample_sizes: extract_sample_sizes(metric_result),
-                 is_significant: get_in(metric_result, ["frequentist", "is_significant"]),
+                 is_significant: is_significant,
                  winning_variant_id: nil
                })
                |> Repo.insert() do
             {:ok, _analysis} ->
-              :ok
+              maybe_notify_significant(experiment, experiment_metric, is_significant)
 
             {:error, changeset} ->
               Logger.error(
@@ -124,17 +128,47 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
           end
       end
     end)
+
+    maybe_schedule_guardrail_check(experiment, tenant_id, metrics)
   end
 
-  defp find_metric_id(metric_key, metrics) when is_binary(metric_key) do
-    Enum.find_value(metrics, fn experiment_metric ->
-      if experiment_metric.metric_definition.key == metric_key do
-        experiment_metric.metric_definition_id
-      end
+  defp find_experiment_metric(metric_key, metrics) when is_binary(metric_key) do
+    Enum.find(metrics, fn experiment_metric ->
+      experiment_metric.metric_definition.key == metric_key
     end)
   end
 
-  defp find_metric_id(_metric_key, _metrics), do: nil
+  defp find_experiment_metric(_metric_key, _metrics), do: nil
+
+  # Only alert on the primary metric — secondary/guardrail significance
+  # isn't "good news" in the same way and guardrail breaches get their own
+  # notification via GuardrailWorker.
+  defp maybe_notify_significant(experiment, %{role: "primary"} = experiment_metric, true) do
+    Notifications.notify_async("analysis.significant", %{
+      "experiment_id" => experiment.id,
+      "experiment_key" => experiment.key,
+      "experiment_name" => experiment.name,
+      "metric_key" => experiment_metric.metric_definition.key,
+      "metric_name" => experiment_metric.metric_definition.name
+    })
+  end
+
+  defp maybe_notify_significant(_experiment, _experiment_metric, _is_significant), do: :ok
+
+  defp maybe_schedule_guardrail_check(experiment, tenant_id, metrics) do
+    if Enum.any?(metrics, &(&1.role == "guardrail")) and
+         Application.get_env(:experiment_hub, :start_oban, true) do
+      try do
+        Oban.insert(
+          GuardrailWorker.new(%{"experiment_id" => experiment.id, "tenant_id" => tenant_id})
+        )
+      rescue
+        error -> Logger.warning("Failed to schedule guardrail check: #{inspect(error)}")
+      catch
+        :exit, reason -> Logger.warning("Failed to schedule guardrail check: #{inspect(reason)}")
+      end
+    end
+  end
 
   defp extract_sample_sizes(metric_result) do
     (metric_result["variants"] || [])

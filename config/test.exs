@@ -42,10 +42,13 @@ config :experiment_hub_web, :jwt_secret, "test-secret-key-do-not-use-in-producti
 
 config :experiment_hub,
   redis_url: System.get_env("REDIS_URL", "redis://localhost:6380"),
-  start_oban: false
+  # Oban itself does start (below) so Oban.insert/1 + assert_enqueued/
+  # refute_enqueued work for worker tests — it just never runs a queue or
+  # plugin automatically (testing: :manual), so nothing executes in the
+  # background during a test run.
+  start_oban: true
 
-# Disable Oban in test
-config :experiment_hub, Oban, queues: false, plugins: false
+config :experiment_hub, Oban, testing: :manual, queues: false, plugins: false
 
 # Kafka stays OFF in unit tests: no brokers means Kafka.Client starts as
 # :ignore and produce/3 returns {:error, :not_configured}, exercising the

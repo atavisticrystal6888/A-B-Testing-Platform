@@ -40,19 +40,21 @@ defmodule ExperimentHub.Metrics.GuardrailEvaluator do
   end
 
   defp get_latest_result(experiment_id, metric_definition_id) do
+    # AnalysisWorker.store_results/4 persists one StatisticalAnalysis row per
+    # metric, with `results` set directly to that metric's flat result object
+    # (metric_key/frequentist/... — no "metrics" wrapper, no "metric_id" key
+    # inside the JSON). Filter by the metric_definition_id column instead of
+    # trying to find it inside the JSON.
     from(sa in ExperimentHub.Metrics.StatisticalAnalysis,
-      where: sa.experiment_id == ^experiment_id,
-      order_by: [desc: sa.inserted_at],
+      where:
+        sa.experiment_id == ^experiment_id and sa.metric_definition_id == ^metric_definition_id,
+      order_by: [desc: sa.computed_at],
       limit: 1
     )
     |> Repo.one()
     |> case do
-      nil ->
-        nil
-
-      analysis ->
-        metrics = analysis.results["metrics"] || []
-        Enum.find(metrics, fn m -> m["metric_id"] == metric_definition_id end)
+      nil -> nil
+      analysis -> analysis.results
     end
   end
 

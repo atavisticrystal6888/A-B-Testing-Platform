@@ -405,51 +405,26 @@ If you are using a tunnel-based demo, expose the dashboard host and keep Phoenix
 
 #### Step 9: First-user bootstrap for non-dev environments
 
-There is no generic non-dev bootstrap task yet. For a native-process hosted deployment (source checkout, Mix available), create the first tenant, first admin user, and first API key from Elixir console:
+`ExperimentHub.Release.bootstrap_first_tenant/4` creates the first tenant, admin user, and SDK API key in one call. It refuses to run if any tenant already exists (safe to invoke more than once, and safe to leave in a deploy script), and — like `migrate/0` — starts only the database connection rather than the full supervision tree, so it works via `eval` without the release already running.
+
+For the containerized release stack (`docker-compose.release.yml`):
 
 ```bash
-MIX_ENV=prod iex -S mix
+docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml run --rm experiment-hub-migrate \
+  bin/experiment_hub_web eval \
+  'ExperimentHub.Release.bootstrap_first_tenant("Acme Corp", "acme", "admin@acme.example", "ChangeMe123!")'
 ```
 
-For the containerized release stack (`docker-compose.release.yml`), there is no `mix` binary in the image — use `rpc` against the running container instead, which executes in the context of the already-started application (unlike `eval`, which boots a fresh, unsupervised instance and fails with "could not lookup Ecto repo" since the app's supervision tree, including Repo, never starts):
+For a native-process hosted deployment (source checkout, Mix available):
 
 ```bash
-docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml exec -T experiment-hub-web \
-  bin/experiment_hub_web rpc "
-    {:ok, tenant} = ExperimentHub.Tenants.create_tenant(%{\"name\" => \"Acme Corp\", \"slug\" => \"acme\"})
-    {:ok, user} = ExperimentHub.Tenants.create_user(%{\"tenant_id\" => tenant.id, \"email\" => \"admin@acme.example\", \"password\" => \"ChangeMe123!\", \"role\" => \"admin\"})
-    {:ok, api_key} = ExperimentHub.Tenants.create_api_key(%{\"tenant_id\" => tenant.id, \"name\" => \"SDK Key\"})
-    IO.puts(api_key.raw_key)
-  "
+MIX_ENV=prod mix run -e \
+  'ExperimentHub.Release.bootstrap_first_tenant("Acme Corp", "acme", "admin@acme.example", "ChangeMe123!")'
 ```
 
-For the native-process path, run this in the `iex -S mix` session started above:
+Either way, the SDK API key prints once to stdout — save it immediately, it can't be retrieved again. To create additional tenants after the first, use the Elixir console (`iex -S mix`, or `bin/experiment_hub_web rpc "..."` against a running release) and call `ExperimentHub.Tenants.create_tenant/1` etc. directly — `bootstrap_first_tenant/4` is deliberately one-time-only.
 
-```elixir
-{:ok, tenant} = ExperimentHub.Tenants.create_tenant(%{
-  "name" => "Acme Corp",
-  "slug" => "acme"
-})
-
-{:ok, user} = ExperimentHub.Tenants.create_user(%{
-  "tenant_id" => tenant.id,
-  "email" => "admin@acme.example",
-  "password" => "ChangeMe123!",
-  "role" => "admin"
-})
-
-{:ok, api_key} = ExperimentHub.Tenants.create_api_key(%{
-  "tenant_id" => tenant.id,
-  "name" => "SDK Key"
-})
-
-api_key.raw_key
-```
-
-Important:
-
-- Save `api_key.raw_key` immediately. The raw key is only available at creation time.
-- Use the tenant slug or tenant ID at login time if the same email may exist in more than one tenant.
+Use the tenant slug or tenant ID at login time if the same email may exist in more than one tenant.
 
 ### Option B: Paid/production web setup
 
@@ -494,6 +469,7 @@ Common optional overrides:
 - `DASHBOARD_PORT`
 - `CORS_ORIGINS`
 - `DASHBOARD_VITE_API_URL`
+- `ALERT_WEBHOOK_URL` — when set, fires a JSON POST (`{event, data, timestamp}`) on a significant primary-metric result or a guardrail breach. Point it at a Slack incoming webhook, PagerDuty, or any receiver that accepts JSON. Unset by default (no alerting).
 
 Notes:
 

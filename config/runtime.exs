@@ -127,7 +127,12 @@ if config_env() == :prod do
   config :experiment_hub,
     redis_url: redis_url,
     stat_engine_url: stat_engine_url,
-    stat_engine_api_key: stat_engine_api_key
+    stat_engine_api_key: stat_engine_api_key,
+    # Optional. When set, a generic JSON POST fires on significant primary
+    # metric results and guardrail breaches. Unset by default — alerting is
+    # opt-in until an operator points this at a real endpoint (Slack
+    # incoming webhook, PagerDuty, a custom receiver, etc).
+    alert_webhook_url: System.get_env("ALERT_WEBHOOK_URL")
 
   config :event_collector,
     kafka_brokers: kafka_brokers,
