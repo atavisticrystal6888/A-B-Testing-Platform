@@ -36,19 +36,18 @@ The project is designed for organizations that want data sovereignty, tenant iso
 - Login
 - Platform overview dashboard
 - Experiment list
-- Experiment detail with start, pause, resume, and analysis actions
+- Experiment detail with start, pause, resume, conclude, and analysis actions
 - Experiment creation wizard
 - Metric definition list
-- Feature flag list
+- Feature flag list and creation
+- Admin settings: API key management and user management
 - Audit log viewer
 
 ### Important current-state caveats
 
 - The dashboard can create experiments, but metric creation and metric attachment still happen through the API.
-- The Feature Flags page currently lists flags; the "Create Flag" button is present in the UI but is not wired into a completed flow.
-- The dashboard does not currently expose a conclude-experiment action; concluding is available through the API.
-- The repository contains controller modules for API keys and users, but those routes are not mounted in the main router right now. For now, create the first tenant user and API keys through Elixir console calls outside the dev bootstrap path.
-- The repository now ships production Dockerfiles for the Phoenix release, statistical engine, and dashboard, plus a compose-based release overlay in `docker-compose.release.yml`.
+- There is no non-dev bootstrap flow for a hosted/production deployment's first tenant and admin user; create them through Elixir console calls (`bin/experiment_hub_web rpc "..."` against a release, or `iex -S mix` in a native checkout) outside the dev bootstrap path. See section 7 for the exact calls.
+- The repository ships production Dockerfiles for the Phoenix release, statistical engine, and dashboard, plus a compose-based release overlay in `docker-compose.release.yml`.
 
 ## 3. How ExperimentHub works
 
@@ -93,20 +92,20 @@ At a high level, the system works like this:
 | --- | --- | --- | --- |
 | Authentication | Available | Dashboard + API | JWT login with optional tenant ID/slug |
 | Tenant-aware experiments | Available | Dashboard + API | Create, list, view, start, pause, resume |
-| Conclude experiment | Available | API | Not currently exposed in the dashboard UI |
+| Conclude experiment | Available | Dashboard + API | Conclude action on the experiment detail page |
 | Assignment API | Available | API/SDK | Deterministic variant assignment |
 | Event ingestion | Available | API/SDK | Single and batch event endpoints |
 | Analysis scheduling | Available | Dashboard + API | Requires Phoenix with Oban plus statistical engine |
 | Results viewing | Available | Dashboard + API | Pending state shown until analyses exist |
-| Feature flags list/evaluate | Available | Dashboard + API | Dashboard is list-first; full management is API-oriented |
-| Metric definition list | Available | Dashboard + API | CRUD is API-driven |
+| Feature flags list/create/evaluate | Available | Dashboard + API | Create Flag is wired in the dashboard |
+| Metric definition list | Available | Dashboard + API | Creation and experiment attachment are API-driven |
 | Attach metrics to experiments | Available | API | Needed for meaningful experiment results |
 | Audit logs | Available | Dashboard + API | Filterable in the UI |
 | Platform analytics overview | Available | Dashboard + API | Current live endpoint is `/api/v1/analytics/overview` |
 | Export results | Available | API | Export endpoints are present in Phoenix |
 | GDPR export/erase | Available | API | API-only workflow |
-| API key management | Partially present | Elixir console for now | Controller code exists, routes are not mounted |
-| User management | Partially present | Elixir console for now | Controller code exists, routes are not mounted |
+| API key management | Available | Dashboard (Admin Settings) + API | `/api/v1/api-keys` routes are mounted |
+| User management | Available | Dashboard (Admin Settings) + API | `/api/v1/users` routes are mounted |
 
 ## 6. Local setup on a developer machine
 
@@ -405,13 +404,25 @@ If you are using a tunnel-based demo, expose the dashboard host and keep Phoenix
 
 #### Step 9: First-user bootstrap for non-dev environments
 
-There is no generic non-dev bootstrap task yet. For a hosted environment, create the first tenant, first admin user, and first API key from Elixir console:
+There is no generic non-dev bootstrap task yet. For a native-process hosted deployment (source checkout, Mix available), create the first tenant, first admin user, and first API key from Elixir console:
 
 ```bash
 MIX_ENV=prod iex -S mix
 ```
 
-Then run:
+For the containerized release stack (`docker-compose.release.yml`), there is no `mix` binary in the image — use `rpc` against the running container instead, which executes in the context of the already-started application (unlike `eval`, which boots a fresh, unsupervised instance and fails with "could not lookup Ecto repo" since the app's supervision tree, including Repo, never starts):
+
+```bash
+docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml exec -T experiment-hub-web \
+  bin/experiment_hub_web rpc "
+    {:ok, tenant} = ExperimentHub.Tenants.create_tenant(%{\"name\" => \"Acme Corp\", \"slug\" => \"acme\"})
+    {:ok, user} = ExperimentHub.Tenants.create_user(%{\"tenant_id\" => tenant.id, \"email\" => \"admin@acme.example\", \"password\" => \"ChangeMe123!\", \"role\" => \"admin\"})
+    {:ok, api_key} = ExperimentHub.Tenants.create_api_key(%{\"tenant_id\" => tenant.id, \"name\" => \"SDK Key\"})
+    IO.puts(api_key.raw_key)
+  "
+```
+
+For the native-process path, run this in the `iex -S mix` session started above:
 
 ```elixir
 {:ok, tenant} = ExperimentHub.Tenants.create_tenant(%{

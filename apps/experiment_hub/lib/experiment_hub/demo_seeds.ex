@@ -93,11 +93,17 @@ defmodule ExperimentHub.DemoSeeds do
   end
 
   defp ensure_current_partitions! do
-    if Mix.env() == :dev do
+    if dev_env?() do
       :ok = PartitionManagerWorker.perform(%Oban.Job{args: %{}})
     else
       :ok
     end
+  end
+
+  # Mix isn't loaded in a compiled release, so Mix.env/0 would crash there;
+  # guard with ensure_loaded? instead of calling it unconditionally.
+  defp dev_env? do
+    Code.ensure_loaded?(Mix) and Mix.env() == :dev
   end
 
   defp ensure_users!(tenant) do

@@ -112,6 +112,12 @@ if config_env() == :prod do
     )
     |> parse_kafka_brokers.()
 
+  # Pre-validation topic that Broadway (EventCollector.Broadway.EventPipeline)
+  # consumes raw client-submitted events from. This is NOT the same topic the
+  # data_pipeline rollup consumer reads — that's the post-validation,
+  # deduplicated topic (experimenthub.events.raw) the producer writes to in
+  # apps/event_collector/lib/event_collector/kafka/producer.ex, configured via
+  # the data_pipeline service's separate KAFKA_EVENT_TOPIC env var.
   kafka_topics =
     System.get_env("KAFKA_TOPICS", "experimenthub.events.inbound")
     |> csv_env.()

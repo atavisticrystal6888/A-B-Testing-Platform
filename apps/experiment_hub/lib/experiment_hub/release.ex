@@ -45,9 +45,13 @@ defmodule ExperimentHub.Release do
   end
 
   defp repo_name(repo) do
+    # `repo` is always one of the fixed, compile-time :ecto_repos list (see
+    # repos/0) — an operator-invoked release command, not a hot path taking
+    # arbitrary input.
     repo
     |> Module.split()
     |> List.last()
+    # credo:disable-for-next-line Credo.Check.Warning.UnsafeToAtom
     |> String.to_atom()
   end
 end

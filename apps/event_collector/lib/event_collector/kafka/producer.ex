@@ -1,6 +1,12 @@
 defmodule EventCollector.Kafka.Producer do
   @moduledoc """
   Kafka producer for writing validated events to `experimenthub.events.raw` topic.
+
+  This is a distinct topic from the pre-validation `KAFKA_TOPICS` env var
+  (default `experimenthub.events.inbound`) that Broadway consumes from — see
+  the comment above `kafka_topics` in config/runtime.exs. Downstream
+  consumers of validated events (e.g. data_pipeline's rollup consumer) should
+  read this topic, not the inbound one.
   """
 
   require Logger

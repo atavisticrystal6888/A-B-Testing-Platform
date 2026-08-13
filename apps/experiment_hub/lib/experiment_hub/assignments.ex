@@ -162,7 +162,10 @@ defmodule ExperimentHub.Assignments do
   end
 
   defp nif_assign_variant(user_id, experiment_key, allocations) do
-    module = Module.concat([AssignmentEngine, Native])
+    # A literal module reference compiles straight to an atom literal — no
+    # runtime atom creation, so no UnsafeToAtom risk (Module.concat/1 was
+    # here before, doing the same thing at runtime instead of compile time).
+    module = AssignmentEngine.Native
 
     if Code.ensure_loaded?(module) and function_exported?(module, :assign_variant, 3) do
       try do

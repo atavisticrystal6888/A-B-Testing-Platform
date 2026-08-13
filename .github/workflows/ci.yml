@@ -53,8 +53,7 @@ jobs:
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
       - run: mix test
-      - run: mix credo --strict || mix credo
-        continue-on-error: true
+      - run: mix credo --strict
 
   rust:
     name: Rust assignment_core

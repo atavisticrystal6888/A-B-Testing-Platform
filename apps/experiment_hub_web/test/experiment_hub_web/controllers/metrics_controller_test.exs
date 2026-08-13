@@ -12,8 +12,12 @@ defmodule ExperimentHubWeb.MetricsControllerTest do
       assert response_content_type(conn, :text) =~ "text/plain"
 
       # At least one known metric family must be present, with TYPE metadata.
-      assert conn.resp_body =~ "# TYPE phoenix_endpoint_stop_duration_milliseconds histogram"
-      assert conn.resp_body =~ "phoenix_endpoint_stop_duration_milliseconds"
+      # Note: TelemetryMetricsPrometheus.Core converts the underlying value to
+      # the declared unit but does not append a unit suffix to the family name
+      # unless the metric's :name option explicitly includes one (it doesn't,
+      # here) — so this stays unit-less rather than *_milliseconds.
+      assert conn.resp_body =~ "# TYPE phoenix_endpoint_stop_duration histogram"
+      assert conn.resp_body =~ "phoenix_endpoint_stop_duration"
     end
 
     test "requires no authentication and ignores Accept header", %{conn: conn} do
