@@ -8,6 +8,7 @@ defmodule ExperimentHub.RLSIntegrationTest do
   use ExperimentHub.DataCase
 
   alias ExperimentHub.Repo
+  alias ExperimentHub.FeatureFlags.Flag
   alias ExperimentHub.Tenants.{User, ApiKey}
   alias ExperimentHub.Experiments.{Experiment, Variant}
 
@@ -135,6 +136,24 @@ defmodule ExperimentHub.RLSIntegrationTest do
 
       assert Repo.get(User, ctx.user_b.id) == nil
     end
+
+    test "tenant A cannot see tenant B's feature flags", ctx do
+      flag_a = create_flag(ctx.tenant_a.id, "flag-under-test")
+      flag_b = create_flag(ctx.tenant_b.id, "flag-under-test")
+
+      Repo.put_tenant_id(ctx.tenant_a.id)
+
+      flag_ids = Flag |> Repo.all() |> Enum.map(& &1.id)
+      assert flag_a.id in flag_ids
+      refute flag_b.id in flag_ids
+      assert Repo.get(Flag, flag_b.id) == nil
+
+      Repo.put_tenant_id(ctx.tenant_b.id)
+
+      flag_ids = Flag |> Repo.all() |> Enum.map(& &1.id)
+      assert flag_b.id in flag_ids
+      refute flag_a.id in flag_ids
+    end
   end
 
   # Helpers to create experiments/variants bypassing context validation
@@ -145,6 +164,16 @@ defmodule ExperimentHub.RLSIntegrationTest do
       "key" => key,
       "name" => name,
       "hypothesis" => "Test hypothesis for #{name}"
+    })
+    |> Repo.insert!()
+  end
+
+  defp create_flag(tenant_id, key) do
+    %Flag{}
+    |> Flag.changeset(%{
+      "tenant_id" => tenant_id,
+      "key" => key,
+      "name" => "Flag #{key}"
     })
     |> Repo.insert!()
   end

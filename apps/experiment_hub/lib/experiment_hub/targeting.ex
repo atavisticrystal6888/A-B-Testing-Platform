@@ -15,7 +15,6 @@ defmodule ExperimentHub.Targeting do
   end
 
   def evaluate(nil, _user_attributes), do: true
-  def evaluate([], _user_attributes), do: true
 
   defp evaluate_rule(%{"attribute" => attr, "operator" => op, "value" => value}, user_attributes) do
     user_value = get_nested_attribute(user_attributes, attr)

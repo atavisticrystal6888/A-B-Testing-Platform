@@ -4,8 +4,8 @@
       name: "default",
       files: %{
         included: [
-          "lib/",
-          "test/"
+          "apps/*/lib/",
+          "apps/*/test/"
         ],
         excluded: [~r"/_build/", ~r"/deps/"]
       },

@@ -59,12 +59,25 @@ services:
     profiles: ["ops"]
     restart: "no"
     environment: *backend-env
+    # Postgres/Kafka/Redis are external to this stack (DATABASE_URL et al.);
+    # only in-stack dependencies are declared here.
     depends_on:
-      postgres:
-        condition: service_healthy
       statistical-engine:
         condition: service_healthy
     command: ["bin/experiment_hub_web", "eval", "ExperimentHub.Release.migrate()"]
+
+  data-pipeline:
+    build:
+      context: .
+      dockerfile: data_pipeline/Dockerfile
+      args:
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${PIPELINE_DATABASE_URL:?set PIPELINE_DATABASE_URL in release.env}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BROKERS:-kafka:9092}
+      ROLLUP_FLUSH_MAX_EVENTS: ${ROLLUP_FLUSH_MAX_EVENTS:-500}
+      ROLLUP_FLUSH_INTERVAL_SECONDS: ${ROLLUP_FLUSH_INTERVAL_SECONDS:-10}
 
   dashboard:
     build:
@@ -73,6 +86,10 @@ services:
       args:
         VITE_API_URL: ${DASHBOARD_VITE_API_URL:-}
     restart: unless-stopped
+    environment:
+      # Runtime API URL written into /env.js at container start; falls back
+      # to the legacy build-time DASHBOARD_VITE_API_URL for compatibility.
+      APP_API_URL: ${DASHBOARD_APP_API_URL:-${DASHBOARD_VITE_API_URL:-}}
     depends_on:
       experiment-hub-web:
         condition: service_started

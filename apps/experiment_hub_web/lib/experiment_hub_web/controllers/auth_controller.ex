@@ -45,12 +45,6 @@ defmodule ExperimentHubWeb.AuthController do
     |> json(%{error: "invalid_credentials", message: "Invalid email or password"})
   end
 
-  defp handle_login_result(conn, _result) do
-    conn
-    |> put_status(401)
-    |> json(%{error: "invalid_credentials", message: "Invalid email or password"})
-  end
-
   def logout(conn, _params) do
     json(conn, %{message: "logged_out"})
   end

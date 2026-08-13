@@ -55,6 +55,14 @@ parse_kafka_brokers = fn value ->
 end
 
 if config_env() == :prod do
+  # Validated at boot so a misconfigured deploy fails fast instead of
+  # surfacing as request-time 500s in SessionAuth.
+  _jwt_secret =
+    required_env!.(
+      "JWT_SECRET",
+      "Used to sign session JWTs. Generate one with: mix phx.gen.secret"
+    )
+
   database_url =
     System.get_env("DATABASE_URL") ||
       raise """
@@ -114,6 +122,10 @@ if config_env() == :prod do
     redis_url: redis_url,
     stat_engine_url: stat_engine_url,
     stat_engine_api_key: stat_engine_api_key
+
+  config :event_collector,
+    kafka_brokers: kafka_brokers,
+    start_pipeline?: System.get_env("KAFKA_CONSUMER_ENABLED", "true") in ~w(true 1)
 
   config :event_collector, EventCollector.Broadway.EventPipeline,
     kafka_brokers: kafka_brokers,

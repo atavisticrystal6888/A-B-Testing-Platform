@@ -13,17 +13,27 @@ from src.api.routes import analysis, bayesian, health, power
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+if not os.getenv("INTERNAL_API_KEY"):
+    logger.warning(
+        "INTERNAL_API_KEY is not set; falling back to the dev default key. "
+        "Set it explicitly in any non-local environment."
+    )
+
 app = FastAPI(
     title="ExperimentHub Statistical Engine",
     version="1.0.0",
     description="Statistical analysis engine for A/B experiments",
 )
 
-# CORS
+# CORS — internal service; browsers only reach it in local dev, so default to
+# dev origins and require CORS_ORIGINS to be set explicitly elsewhere.
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:4000").split(",")
+if "*" in _cors_origins:
+    logger.warning("CORS_ORIGINS is set to '*'; wildcard origins are unsafe in production")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials="*" not in _cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

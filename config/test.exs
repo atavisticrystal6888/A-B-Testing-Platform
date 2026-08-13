@@ -1,5 +1,9 @@
 import Config
 
+# Fast, insecure hashing in tests only — full-cost pbkdf2 exceeds 60s per hash
+# on some machines and times out ExUnit.
+config :pbkdf2_elixir, rounds: 1
+
 db_username = System.get_env("DB_USERNAME", "postgres")
 db_password = System.get_env("DB_PASSWORD", "postgres")
 db_hostname = System.get_env("DB_HOST", "localhost")
@@ -42,3 +46,11 @@ config :experiment_hub,
 
 # Disable Oban in test
 config :experiment_hub, Oban, queues: false, plugins: false
+
+# Kafka stays OFF in unit tests: no brokers means Kafka.Client starts as
+# :ignore and produce/3 returns {:error, :not_configured}, exercising the
+# DiskBuffer fallback. The kafka_integration-tagged test starts its own
+# brod client against localhost:9092.
+config :event_collector,
+  kafka_brokers: [],
+  start_pipeline?: false

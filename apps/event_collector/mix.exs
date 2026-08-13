@@ -26,11 +26,11 @@ defmodule EventCollector.MixProject do
   defp deps do
     [
       {:broadway, "~> 1.0"},
-      # NOTE: broadway_kafka and brod require snappyer which needs the `pc` rebar3 plugin.
-      # On environments with TLS interception, rebar3 cannot download `pc`.
-      # Uncomment these when building in Docker or resolving TLS cert issues:
-      # {:broadway_kafka, "~> 0.4"},
-      # {:brod, "~> 3.18"},
+      # broadway_kafka -> brod -> kafka_protocol -> crc32cer (C NIF).
+      # crc32cer's hex package only builds its NIF on unix (make pre-hook);
+      # on Windows compile libcrc32cer_nif.dll manually with gcc from
+      # deps/crc32cer/{c_src,external/crc32c} into deps/crc32cer/priv/.
+      {:broadway_kafka, "~> 0.4"},
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:experiment_hub, in_umbrella: true},

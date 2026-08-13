@@ -1,13 +1,16 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConcludeExperiment, useExperiment, useExperimentAction } from "../hooks/useExperiments";
 import { useExperimentResults } from "../hooks/useResults";
 import { useWebSocket } from "../contexts/WebSocketContext";
-import ConfidenceIntervalChart from "../components/charts/ConfidenceIntervalChart";
-import ConversionOverTimeChart from "../components/charts/ConversionOverTimeChart";
 import { ConcludeModal } from "../components/experiments/ConcludeModal";
 import type { AnalysisResults, ConclusionDecision, Experiment, MetricResult } from "../lib/types";
+
+// Loaded on demand so the Recharts dependency stays out of this page's chunk.
+const ExperimentResultsCharts = lazy(
+  () => import("../components/experiments/ExperimentResultsCharts"),
+);
 
 function VariantTable({ experiment, results }: { experiment: Experiment; results?: AnalysisResults }) {
   const primaryMetric = results?.metrics.find((m) => m.role === "primary");
@@ -269,10 +272,11 @@ export default function ExperimentDetailPage() {
 
       {/* Charts */}
       {hasAnalysisResults && results && (
-        <div className="grid grid-cols-2 gap-6 mt-6">
-          <ConfidenceIntervalChart results={results} />
-          <ConversionOverTimeChart experimentId={id!} />
-        </div>
+        <Suspense
+          fallback={<div className="mt-6 text-sm text-gray-500">Loading charts...</div>}
+        >
+          <ExperimentResultsCharts results={results} experimentId={id!} />
+        </Suspense>
       )}
 
       {/* Guardrail Alerts */}

@@ -66,3 +66,15 @@ config :phoenix, :stacktrace_depth, 20
 config :phoenix, :plug_init_mode, :runtime
 
 config :experiment_hub_web, :jwt_secret, "dev-secret-key-do-not-use-in-production"
+
+# Kafka (docker compose exposes a single broker on localhost:9092).
+# The Broadway consumer pipeline is enabled in dev; brod retries broker
+# connections internally, so a stopped Kafka container does not crash the app.
+config :event_collector,
+  kafka_brokers: [{"localhost", 9092}],
+  start_pipeline?: true
+
+config :event_collector, EventCollector.Broadway.EventPipeline,
+  kafka_brokers: [{"localhost", 9092}],
+  kafka_group_id: "experimenthub-event-collector",
+  kafka_topics: ["experimenthub.events.inbound"]

@@ -6,7 +6,6 @@ defmodule ExperimentHubWeb.Plugs.TraceContext do
   """
 
   import Plug.Conn
-  require Logger
 
   def init(opts), do: opts
 

@@ -12,7 +12,8 @@ defmodule ExperimentHub.FeatureFlags.FlagTargeting do
   """
   def evaluate(flag, context) do
     cond do
-      flag.status == "disabled" ->
+      # Only "enabled" flags evaluate; "disabled" or any unknown status is off.
+      flag.status != "enabled" ->
         false
 
       flag.targeting_rules == nil || flag.targeting_rules == [] ->
@@ -27,7 +28,9 @@ defmodule ExperimentHub.FeatureFlags.FlagTargeting do
   end
 
   defp evaluate_rollout(flag, context) do
-    if flag.rollout_percentage >= 10_000 do
+    # nil rollout_percentage means "no rollout limit" (nil >= is deliberate:
+    # atoms sort above integers, so nil passes the full-rollout check).
+    if flag.rollout_percentage == nil or flag.rollout_percentage >= 10_000 do
       true
     else
       user_id = Map.get(context, "user_id") || Map.get(context, :user_id, "")

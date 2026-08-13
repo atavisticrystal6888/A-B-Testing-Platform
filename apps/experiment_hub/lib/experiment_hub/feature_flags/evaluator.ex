@@ -1,14 +1,21 @@
 defmodule ExperimentHub.FeatureFlags.Evaluator do
   @moduledoc """
-  Feature flag evaluation logic (FR-125).
-  Evaluates flags based on enabled status, rollout percentage, and targeting rules.
+  Feature flag evaluation logic (FR-125), SDK-facing entry points.
+
+  Delegates the actual decision to `ExperimentHub.FeatureFlags.FlagTargeting`
+  so the SDK endpoint, the admin API, and bulk evaluation share one
+  implementation (status + targeting rules + rollout bucketing).
+
+  Unlike `FeatureFlags.evaluate/3`, unknown flags evaluate to `{:ok, false}`
+  rather than an error — SDK clients treat missing flags as "off".
   """
 
   alias ExperimentHub.FeatureFlags
+  alias ExperimentHub.FeatureFlags.FlagTargeting
 
   @doc """
   Evaluate a feature flag for a user.
-  Returns {:ok, true/false} or {:error, reason}.
+  Returns {:ok, true/false}.
   """
   def evaluate(tenant_id, flag_key, user_id, user_attributes \\ %{}) do
     case FeatureFlags.get_flag_by_key(tenant_id, flag_key) do
@@ -16,8 +23,7 @@ defmodule ExperimentHub.FeatureFlags.Evaluator do
         {:ok, false}
 
       flag ->
-        result = evaluate_flag(flag, user_id, user_attributes)
-        {:ok, result}
+        {:ok, FlagTargeting.evaluate(flag, evaluation_context(user_id, user_attributes))}
     end
   end
 
@@ -26,46 +32,17 @@ defmodule ExperimentHub.FeatureFlags.Evaluator do
   """
   def evaluate_all(tenant_id, user_id, user_attributes \\ %{}) do
     flags = FeatureFlags.list_flags(tenant_id)
+    context = evaluation_context(user_id, user_attributes)
 
     results =
       Map.new(flags, fn flag ->
-        {flag.key, evaluate_flag(flag, user_id, user_attributes)}
+        {flag.key, FlagTargeting.evaluate(flag, context)}
       end)
 
     {:ok, results}
   end
 
-  defp evaluate_flag(flag, user_id, user_attributes) do
-    cond do
-      flag.status != "active" -> false
-      not check_targeting(flag, user_attributes) -> false
-      not check_rollout(flag, user_id) -> false
-      true -> true
-    end
-  end
-
-  defp check_targeting(flag, user_attributes) do
-    case flag.targeting_rules do
-      nil -> true
-      [] -> true
-      rules -> ExperimentHub.Targeting.evaluate(rules, user_attributes)
-    end
-  end
-
-  defp check_rollout(flag, user_id) do
-    case flag.rollout_percentage do
-      nil ->
-        true
-
-      10000 ->
-        true
-
-      0 ->
-        false
-
-      pct ->
-        bucket = :erlang.phash2("#{flag.key}:#{user_id}", 10000)
-        bucket < pct
-    end
+  defp evaluation_context(user_id, user_attributes) do
+    Map.put(user_attributes || %{}, "user_id", user_id)
   end
 end

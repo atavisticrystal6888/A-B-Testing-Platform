@@ -136,22 +136,17 @@ defmodule ExperimentHub.Assignments do
       user_id: user_id
     })
 
-    result = build_result(experiment, variant, user_id, tenant_id, true, "hash")
-
-    case result do
-      {:ok, r} ->
-        EventPublisher.publish_assignment(r)
-        {:ok, r}
-
-      other ->
-        other
-    end
+    {:ok, r} = build_result(experiment, variant, user_id, tenant_id, true, "hash")
+    EventPublisher.publish_assignment(r)
+    {:ok, r}
   end
 
+  # Must stay bit-identical to AssignmentEngine.Native.hash_to_bucket/2 and the
+  # Rust NIF (MurmurHash3 x64_128, seed 0) — all three paths are interchangeable
+  # at runtime, and any divergence silently re-buckets users.
   defp elixir_assign(user_id, experiment_key, allocations) do
     hash_input = "#{experiment_key}:#{user_id}"
-    <<hash::unsigned-integer-size(128)>> = :crypto.hash(:md5, hash_input)
-    bucket = rem(hash, 10_000)
+    bucket = hash_input |> Murmur.hash_x64_128(0) |> rem(10_000)
 
     allocations
     |> Enum.reduce_while({0, 0}, fn alloc, {cumulative, idx} ->

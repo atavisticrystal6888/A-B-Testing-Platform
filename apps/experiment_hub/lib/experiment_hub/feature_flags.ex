@@ -82,14 +82,9 @@ defmodule ExperimentHub.FeatureFlags do
     end)
   end
 
-  defp evaluate_flag(%Flag{status: "disabled"}, _context), do: false
-  defp evaluate_flag(%Flag{status: "enabled", rollout_percentage: 10_000}, _context), do: true
-
-  defp evaluate_flag(%Flag{status: "enabled"} = flag, context) do
-    user_id = Map.get(context, "user_id") || Map.get(context, :user_id, "")
-    hash = :erlang.phash2({flag.key, user_id}, 10_000)
-    hash < flag.rollout_percentage
+  # Single source of truth for flag evaluation (status + targeting + rollout);
+  # the SDK-facing Evaluator delegates here too.
+  defp evaluate_flag(%Flag{} = flag, context) do
+    ExperimentHub.FeatureFlags.FlagTargeting.evaluate(flag, context)
   end
-
-  defp evaluate_flag(_, _), do: false
 end

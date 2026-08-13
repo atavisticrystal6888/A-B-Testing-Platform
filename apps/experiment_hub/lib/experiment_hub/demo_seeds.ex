@@ -94,10 +94,7 @@ defmodule ExperimentHub.DemoSeeds do
 
   defp ensure_current_partitions! do
     if Mix.env() == :dev do
-      case PartitionManagerWorker.perform(%Oban.Job{}) do
-        :ok -> :ok
-        other -> raise "demo partition setup failed: #{inspect(other)}"
-      end
+      :ok = PartitionManagerWorker.perform(%Oban.Job{args: %{}})
     else
       :ok
     end

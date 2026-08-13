@@ -14,13 +14,20 @@ defmodule AssignmentEngine.Native do
 
   @doc """
   Hash user_id and experiment_key into a bucket in [0, 10000).
+
+  Must stay bit-identical to `assignment_core::hash::hash_to_bucket` (MurmurHash3
+  x64_128, seed 0, over "experiment_key:user_id") — the NIF and this fallback are
+  interchangeable at runtime, so any divergence would silently re-bucket users.
+  Parity is pinned by golden vectors in native_test.exs generated via
+  `cargo run --example golden_vectors`.
   """
   def hash_to_bucket(user_id, experiment_key)
       when is_binary(user_id) and is_binary(experiment_key) do
     hash_input = experiment_key <> ":" <> user_id
 
-    <<bucket::unsigned-integer-size(32), _rest::binary>> = :crypto.hash(:sha256, hash_input)
-    rem(bucket, 10_000)
+    hash_input
+    |> Murmur.hash_x64_128(0)
+    |> rem(10_000)
   end
 
   @doc """

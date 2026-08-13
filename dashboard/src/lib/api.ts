@@ -1,10 +1,32 @@
 /** Typed API client with fetch wrapper, auth headers, and error handling */
 
+/**
+ * Runtime configuration injected by the hosting environment via /env.js
+ * (generated at container startup — see docker/40-generate-env-config.sh).
+ * In dev the file may be absent; every read must tolerate that.
+ */
+interface AppRuntimeConfig {
+  apiUrl?: string;
+}
+
+declare global {
+  interface Window {
+    __APP_CONFIG__?: AppRuntimeConfig;
+  }
+}
+
 function normalizeBaseUrl(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
 export function getApiBaseUrl(): string {
+  const runtimeBaseUrl =
+    typeof window !== "undefined" ? window.__APP_CONFIG__?.apiUrl : undefined;
+
+  if (runtimeBaseUrl) {
+    return normalizeBaseUrl(runtimeBaseUrl);
+  }
+
   const configuredBaseUrl = import.meta.env.VITE_API_URL;
 
   if (configuredBaseUrl) {

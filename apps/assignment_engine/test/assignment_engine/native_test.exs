@@ -71,4 +71,29 @@ defmodule AssignmentEngine.NativeTest do
       assert idx == 0
     end
   end
+
+  describe "Rust/Elixir parity" do
+    # Golden vectors generated from the Rust crate:
+    #   cd assignment_core && cargo run --example golden_vectors
+    # {experiment_key, user_id, bucket} — both implementations must agree, or
+    # toggling ASSIGNMENT_ENGINE_BUILD_NIF would re-bucket every user.
+    @golden_vectors [
+      {"exp-1", "user-1", 5323},
+      {"exp-1", "user-2", 8042},
+      {"checkout-cta", "manual-e2e-user-001", 7539},
+      {"exp-unicode", "üser-ñ", 8924},
+      {"exp-long", "a-rather-long-user-identifier-0123456789", 5607},
+      {"e", "u", 1959},
+      {"exp-1", "", 9129},
+      {"", "user-1", 8154}
+    ]
+
+    test "hash_to_bucket matches assignment_core golden vectors" do
+      for {experiment_key, user_id, expected_bucket} <- @golden_vectors do
+        assert AssignmentEngine.Native.hash_to_bucket(user_id, experiment_key) ==
+                 expected_bucket,
+               "bucket mismatch for {#{inspect(experiment_key)}, #{inspect(user_id)}}"
+      end
+    end
+  end
 end

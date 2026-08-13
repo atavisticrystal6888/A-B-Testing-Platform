@@ -29,6 +29,12 @@ defmodule ExperimentHubWeb.Router do
     get "/health", HealthController, :index
   end
 
+  # Prometheus scrape endpoint (no auth, no pipeline: scrapers send
+  # Accept headers that the JSON-only :api pipeline would reject).
+  scope "/", ExperimentHubWeb do
+    get "/metrics", MetricsController, :index
+  end
+
   # Auth endpoints (public)
   scope "/api/v1/auth", ExperimentHubWeb do
     pipe_through :api

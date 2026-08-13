@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FeatureFlagList } from '../components/flags/FeatureFlagList';
+import { FeatureFlagDetailPanel } from '../components/flags/FeatureFlagDetailPanel';
 import { api } from '../lib/api';
 
 interface Flag {
@@ -12,6 +14,7 @@ interface Flag {
 }
 
 export function FeatureFlagsPage() {
+  const [selectedFlagId, setSelectedFlagId] = useState<string | null>(null);
   const { data: flags = [], isLoading, isError } = useQuery({
     queryKey: ['feature-flags'],
     queryFn: () =>
@@ -36,7 +39,14 @@ export function FeatureFlagsPage() {
           Unable to load feature flags right now.
         </div>
       ) : (
-        <FeatureFlagList flags={flags} onSelect={(id) => console.log('Selected flag:', id)} />
+        <FeatureFlagList flags={flags} onSelect={setSelectedFlagId} />
+      )}
+
+      {selectedFlagId && (
+        <FeatureFlagDetailPanel
+          flagId={selectedFlagId}
+          onClose={() => setSelectedFlagId(null)}
+        />
       )}
     </div>
   );

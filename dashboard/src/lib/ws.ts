@@ -54,7 +54,6 @@ export function joinChannel(topic: string): Channel | null {
 
   const channel = socket.channel(topic, {});
   channel.join()
-    .receive('ok', () => console.log(`Joined ${topic}`))
     .receive('error', (reason: unknown) => console.error(`Failed to join ${topic}:`, reason));
 
   return channel;

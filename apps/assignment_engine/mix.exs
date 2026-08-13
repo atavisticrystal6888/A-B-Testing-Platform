@@ -25,6 +25,7 @@ defmodule AssignmentEngine.MixProject do
   defp deps do
     [
       {:rustler, "~> 0.35"},
+      {:murmur, "~> 2.0"},
       {:experiment_hub, in_umbrella: true}
     ]
   end

@@ -32,6 +32,7 @@ defmodule ExperimentHub.MixProject do
       {:postgrex, ">= 0.0.0"},
       {:jason, "~> 1.4"},
       {:oban, "~> 2.17"},
+      {:murmur, "~> 2.0"},
       {:nimble_options, "~> 1.1"},
       {:pbkdf2_elixir, "~> 2.2"},
       {:redix, "~> 1.4"},

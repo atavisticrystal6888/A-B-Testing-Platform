@@ -289,8 +289,9 @@ describe("Experiment detail realtime rendering", () => {
     expect(await screen.findByRole("button", { name: "Pause" })).toBeInTheDocument();
     expect(screen.getByText("Statistical Significance")).toBeInTheDocument();
     expect(screen.getByText("Only 2000 of 7678 required samples collected. Continue running.")).toBeInTheDocument();
-    expect(screen.getByText("Confidence Interval Chart")).toBeInTheDocument();
-    expect(screen.getByText("Conversion Rate Over Time")).toBeInTheDocument();
+    // Charts are lazy-loaded, so wait for the chunk to resolve.
+    expect(await screen.findByText("Confidence Interval Chart")).toBeInTheDocument();
+    expect(await screen.findByText("Conversion Rate Over Time")).toBeInTheDocument();
     expect(screen.queryByText("Analysis Pending")).not.toBeInTheDocument();
 
     await waitFor(() => expect(socketSpies.connect).toHaveBeenCalledTimes(1));

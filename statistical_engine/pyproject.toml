@@ -21,7 +21,9 @@ dev = [
     "hypothesis>=6.92.0",
     "ruff>=0.2.0",
     "mypy>=1.8.0",
-    "httpx2>=0.28.1",
+    # Pydantic-stewarded continuation of httpx (2026 handover); preferred by
+    # starlette>=1.6 TestClient.
+    "httpx2>=2.10.0",
 ]
 
 [tool.pytest.ini_options]

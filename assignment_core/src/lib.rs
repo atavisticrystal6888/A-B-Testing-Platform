@@ -6,8 +6,6 @@ pub use assignment::assign_variant;
 // Rustler NIF bindings for Elixir interop
 #[cfg(not(target_arch = "wasm32"))]
 mod nif {
-    use rustler::{Env, Term, NifResult};
-
     rustler::init!("Elixir.AssignmentEngine.Native");
 
     #[rustler::nif]

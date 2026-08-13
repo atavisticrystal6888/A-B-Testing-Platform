@@ -6,12 +6,19 @@ defmodule ExperimentHubWeb.Telemetry do
     Supervisor.start_link(__MODULE__, arg, name: __MODULE__)
   end
 
+  # Histogram buckets used when exporting duration-style metrics to Prometheus
+  # (values are in the metric's declared unit, i.e. milliseconds for durations).
+  @prometheus_buckets [1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000]
+
   @impl true
   def init(_arg) do
     children = [
       # Telemetry poller will execute the given period measurements
       # every 10_000ms. Learn more here: https://hexdocs.pm/telemetry_metrics
-      {:telemetry_poller, measurements: periodic_measurements(), period: 10_000}
+      {:telemetry_poller, measurements: periodic_measurements(), period: 10_000},
+      # Prometheus exporter (Article IX): aggregates the metrics below and
+      # serves them via GET /metrics (see ExperimentHubWeb.MetricsController).
+      {TelemetryMetricsPrometheus.Core, metrics: prometheus_metrics()}
       # Add reporters as children of your supervision tree.
       # {Telemetry.Metrics.ConsoleReporter, metrics: metrics()}
     ]
@@ -68,6 +75,34 @@ defmodule ExperimentHubWeb.Telemetry do
       )
     ]
   end
+
+  @doc """
+  The metric definitions above, adapted for the Prometheus exporter.
+
+  `TelemetryMetricsPrometheus.Core` does not support the `summary` metric
+  type, so summaries are exported as `distribution` (Prometheus histogram)
+  with default buckets. Byte-unit conversions are also unsupported by the
+  exporter, so those metrics are exported in plain bytes.
+  """
+  def prometheus_metrics do
+    Enum.map(metrics(), &to_prometheus_metric/1)
+  end
+
+  defp to_prometheus_metric(%Telemetry.Metrics.Summary{} = summary) do
+    fields =
+      summary
+      |> Map.from_struct()
+      |> Map.update!(:reporter_options, &Keyword.put_new(&1, :buckets, @prometheus_buckets))
+      |> Map.update!(:unit, &prometheus_unit/1)
+
+    struct!(Telemetry.Metrics.Distribution, fields)
+  end
+
+  defp to_prometheus_metric(metric), do: metric
+
+  # The exporter only understands time conversions; export byte metrics as-is.
+  defp prometheus_unit({:byte, _to}), do: :byte
+  defp prometheus_unit(unit), do: unit
 
   defp periodic_measurements do
     [
