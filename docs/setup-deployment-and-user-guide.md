@@ -38,14 +38,15 @@ The project is designed for organizations that want data sovereignty, tenant iso
 - Experiment list
 - Experiment detail with start, pause, resume, conclude, and analysis actions
 - Experiment creation wizard
-- Metric definition list
-- Feature flag list and creation
+- Metric definition list, creation, editing, and deletion
+- Attaching/detaching metrics to experiments (primary/secondary/guardrail), from the experiment detail page
+- Feature flag list
 - Admin settings: API key management and user management
 - Audit log viewer
 
 ### Important current-state caveats
 
-- The dashboard can create experiments, but metric creation and metric attachment still happen through the API.
+- The Feature Flags page has a "Create Flag" button, but it isn't wired to anything yet — creating and updating flags still happens through the API.
 - There is no non-dev bootstrap flow for a hosted/production deployment's first tenant and admin user; create them through Elixir console calls (`bin/experiment_hub_web rpc "..."` against a release, or `iex -S mix` in a native checkout) outside the dev bootstrap path. See section 7 for the exact calls.
 - The repository ships production Dockerfiles for the Phoenix release, statistical engine, and dashboard, plus a compose-based release overlay in `docker-compose.release.yml`.
 
@@ -97,9 +98,9 @@ At a high level, the system works like this:
 | Event ingestion | Available | API/SDK | Single and batch event endpoints |
 | Analysis scheduling | Available | Dashboard + API | Requires Phoenix with Oban plus statistical engine |
 | Results viewing | Available | Dashboard + API | Pending state shown until analyses exist |
-| Feature flags list/create/evaluate | Available | Dashboard + API | Create Flag is wired in the dashboard |
-| Metric definition list | Available | Dashboard + API | Creation and experiment attachment are API-driven |
-| Attach metrics to experiments | Available | API | Needed for meaningful experiment results |
+| Feature flags list/evaluate | Available | Dashboard + API | Dashboard is list-first; creation/updates are API-driven ("Create Flag" button not yet wired) |
+| Metric definition list/create/edit | Available | Dashboard + API | Create Metric and edit are wired in the dashboard |
+| Attach metrics to experiments | Available | Dashboard + API | Attach Metric on the experiment detail page |
 | Audit logs | Available | Dashboard + API | Filterable in the UI |
 | Platform analytics overview | Available | Dashboard + API | Current live endpoint is `/api/v1/analytics/overview` |
 | Export results | Available | API | Export endpoints are present in Phoenix |
