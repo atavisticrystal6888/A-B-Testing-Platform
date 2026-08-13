@@ -69,9 +69,10 @@ describe("useExperiments", () => {
 
 describe("useExperiment", () => {
   it("fetches single experiment", async () => {
-    const mockData = {
-      data: { id: "1", name: "Test", key: "test", status: "draft", variants: [] },
-    };
+    // GET /api/v1/experiments/:id returns the experiment bare (no `data`
+    // envelope) — only list responses wrap in {data, meta}. See
+    // ExperimentHubWeb.ExperimentJSON.show/1.
+    const mockData = { id: "1", name: "Test", key: "test", status: "draft", variants: [] };
 
     vi.mocked(api.get).mockResolvedValue(mockData);
 
@@ -80,6 +81,6 @@ describe("useExperiment", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.data.name).toBe("Test");
+    expect(result.current.data?.name).toBe("Test");
   });
 });

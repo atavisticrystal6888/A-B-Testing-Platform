@@ -3,9 +3,90 @@ import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConcludeExperiment, useExperiment, useExperimentAction } from "../hooks/useExperiments";
 import { useExperimentResults } from "../hooks/useResults";
+import { useDetachMetric } from "../hooks/useExperimentMetrics";
 import { useWebSocket } from "../contexts/WebSocketContext";
 import { ConcludeModal } from "../components/experiments/ConcludeModal";
+import { AttachMetricModal } from "../components/experiments/AttachMetricModal";
 import type { AnalysisResults, ConclusionDecision, Experiment, MetricResult } from "../lib/types";
+
+const ROLE_BADGE_STYLES: Record<string, string> = {
+  primary: "bg-indigo-100 text-indigo-700",
+  secondary: "bg-gray-100 text-gray-600",
+  guardrail: "bg-amber-100 text-amber-700",
+};
+
+function AttachedMetricsCard({ experiment }: { experiment: Experiment }) {
+  const [isAttachModalOpen, setIsAttachModalOpen] = useState(false);
+  const detachMutation = useDetachMetric();
+  const metrics = experiment.metrics ?? [];
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-900">Metrics</h3>
+        <button
+          onClick={() => setIsAttachModalOpen(true)}
+          className="px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+        >
+          Attach Metric
+        </button>
+      </div>
+
+      {metrics.length === 0 ? (
+        <div className="px-6 py-8 text-center text-sm text-gray-500">
+          No metrics attached yet. Attach a primary metric before running analysis.
+        </div>
+      ) : (
+        <ul className="divide-y divide-gray-100">
+          {metrics.map((metric) => (
+            <li key={metric.id} className="px-6 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span
+                  className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${
+                    ROLE_BADGE_STYLES[metric.role] ?? "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {metric.role}
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{metric.name ?? metric.key}</p>
+                  {metric.role === "guardrail" && metric.guardrail_threshold != null && (
+                    <p className="text-xs text-gray-500">
+                      Breaches if {metric.guardrail_direction} {metric.guardrail_threshold}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() =>
+                  detachMutation.mutate({ experimentId: experiment.id, experimentMetricId: metric.id })
+                }
+                disabled={detachMutation.isPending}
+                className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {detachMutation.isError && (
+        <p className="px-6 py-3 text-sm text-red-600 border-t border-red-100 bg-red-50">
+          Unable to remove that metric right now.
+        </p>
+      )}
+
+      {isAttachModalOpen && (
+        <AttachMetricModal
+          experimentId={experiment.id}
+          attachedMetrics={metrics}
+          onClose={() => setIsAttachModalOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
 
 // Loaded on demand so the Recharts dependency stays out of this page's chunk.
 const ExperimentResultsCharts = lazy(
@@ -235,6 +316,11 @@ export default function ExperimentDetailPage() {
       {/* Variant Table */}
       <div className="mt-6">
         <VariantTable experiment={experiment} results={results} />
+      </div>
+
+      {/* Attached Metrics */}
+      <div className="mt-6">
+        <AttachedMetricsCard experiment={experiment} />
       </div>
 
       {!hasAnalysisResults && (

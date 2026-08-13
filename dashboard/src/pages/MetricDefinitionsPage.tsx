@@ -1,15 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import { api } from "../lib/api";
+import { useState } from "react";
+import { useMetricDefinitions } from "../hooks/useMetricDefinitions";
+import { MetricDefinitionPanel } from "../components/metrics/MetricDefinitionPanel";
 import type { MetricDefinition } from "../lib/types";
 
+type PanelState = { mode: "create" } | { mode: "edit"; id: string } | null;
+
 export default function MetricDefinitionsPage() {
-  const { data: metrics = [], isLoading, isError } = useQuery<MetricDefinition[]>({
-    queryKey: ["metric-definitions"],
-    queryFn: () =>
-      api
-        .get<{ data: MetricDefinition[] }>("/api/v1/metric-definitions")
-        .then((response) => response.data ?? []),
-  });
+  const { data: metrics = [], isLoading, isError } = useMetricDefinitions();
+  const [panelState, setPanelState] = useState<PanelState>(null);
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
@@ -17,9 +15,15 @@ export default function MetricDefinitionsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Metrics</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Review the metric definitions available to your tenant.
+            Review and manage the metric definitions available to your tenant.
           </p>
         </div>
+        <button
+          onClick={() => setPanelState({ mode: "create" })}
+          className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm"
+        >
+          Create Metric
+        </button>
       </div>
 
       {isLoading ? (
@@ -55,7 +59,11 @@ export default function MetricDefinitionsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {metrics.map((metric: MetricDefinition) => (
-                <tr key={metric.id} className="hover:bg-gray-50 transition-colors">
+                <tr
+                  key={metric.id}
+                  onClick={() => setPanelState({ mode: "edit", id: metric.id })}
+                  className="hover:bg-gray-50 transition-colors cursor-pointer"
+                >
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">{metric.name}</td>
                   <td className="px-6 py-4 text-sm font-mono text-gray-500">{metric.key}</td>
                   <td className="px-6 py-4 text-sm text-gray-600 capitalize">{metric.metric_type}</td>
@@ -67,6 +75,13 @@ export default function MetricDefinitionsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {panelState?.mode === "create" && (
+        <MetricDefinitionPanel mode="create" onClose={() => setPanelState(null)} />
+      )}
+      {panelState?.mode === "edit" && (
+        <MetricDefinitionPanel mode="edit" id={panelState.id} onClose={() => setPanelState(null)} />
       )}
     </div>
   );

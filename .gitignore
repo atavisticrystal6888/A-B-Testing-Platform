@@ -28,6 +28,7 @@ build/
 node_modules/
 dashboard/dist/
 dashboard/build/
+dashboard/tsconfig.tsbuildinfo
 dashboard/coverage/
 
 # IDE

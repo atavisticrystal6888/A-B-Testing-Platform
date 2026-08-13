@@ -113,4 +113,27 @@ export const api = {
   delete: <T>(path: string) => request<T>("DELETE", path),
 };
 
+/**
+ * Extracts a human-readable message from an API error. Handles the
+ * FallbackController's changeset shape ({error, errors: {field: [msg]}})
+ * and single-message error shapes ({error, message}); falls back to a
+ * caller-supplied default for anything else (network errors, etc.).
+ */
+export function describeApiError(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiError) || typeof error.body !== "object" || error.body === null) {
+    return fallback;
+  }
+
+  const body = error.body as { message?: string; errors?: Record<string, string[]> };
+
+  if (body.errors) {
+    const fieldMessages = Object.entries(body.errors).map(
+      ([field, messages]) => `${field} ${messages.join(", ")}`,
+    );
+    if (fieldMessages.length > 0) return fieldMessages.join("; ");
+  }
+
+  return body.message ?? fallback;
+}
+
 export { ApiError };
