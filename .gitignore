@@ -68,6 +68,9 @@ mix.lock is tracked
 postgres_data/
 redis_data/
 
+# Local database backups (postgres-backup compose profile)
+/backups/
+
 # Local Docker build trust anchors
 /docker/certs/*.crt
 !/docker/certs/.gitkeep
@@ -79,3 +82,5 @@ k6/results/
 /tmp/release-smoke/
 /tmp/release-prod-smoke/
 /tmp/event_buffer/
+
+graphify-out/

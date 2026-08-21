@@ -4,6 +4,7 @@ Beta-Binomial for conversion metrics, Normal-Normal for continuous.
 """
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from scipy import stats
@@ -28,7 +29,7 @@ def beta_binomial_analysis(
     prior_beta: float = 1.0,
     rope: float = 0.005,
     n_samples: int = 100_000,
-) -> dict:
+) -> dict[str, Any]:
     """
     Bayesian analysis for conversion rate metrics using Beta-Binomial model.
     """
@@ -95,7 +96,7 @@ def normal_analysis(
     treatment_n: int,
     rope: float = 0.01,
     n_samples: int = 100_000,
-) -> dict:
+) -> dict[str, Any]:
     """
     Bayesian analysis for continuous metrics using Normal-Normal model.
     """

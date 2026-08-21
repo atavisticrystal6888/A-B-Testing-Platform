@@ -20,7 +20,9 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "hypothesis>=6.92.0",
     "ruff>=0.2.0",
-    "mypy>=1.8.0",
+    # Upper-bounded: mypy majors change strict-mode defaults, and an
+    # unannounced resolver jump already broke CI once.
+    "mypy>=1.8.0,<3",
     # Pydantic-stewarded continuation of httpx (2026 handover); preferred by
     # starlette>=1.6 TestClient.
     "httpx2>=2.10.0",

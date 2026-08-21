@@ -48,7 +48,11 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
             metric_type: md.metric_type,
             role: em.role,
             guardrail_threshold: em.guardrail_threshold,
-            guardrail_direction: em.guardrail_direction
+            guardrail_direction: em.guardrail_direction,
+            # Real per-variant counts aggregated from assignments/events —
+            # the engine computes statistics from these; without them it
+            # reports insufficient_data rather than inventing numbers.
+            variant_stats: Metrics.AnalysisData.variant_stats(experiment, em)
           }
         end),
       variants:

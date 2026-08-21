@@ -1,5 +1,7 @@
 """Bayesian API routes for the statistical engine (FR-105)."""
 
+from typing import Any
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -29,7 +31,7 @@ class BayesianContinuousRequest(BaseModel):
 
 
 @router.post("/conversion")
-async def bayesian_conversion(request: BayesianConversionRequest):
+async def bayesian_conversion(request: BayesianConversionRequest) -> dict[str, Any]:
     """Bayesian analysis for conversion rate metrics."""
     result = beta_binomial_analysis(
         control_successes=request.control_successes,
@@ -44,7 +46,7 @@ async def bayesian_conversion(request: BayesianConversionRequest):
 
 
 @router.post("/continuous")
-async def bayesian_continuous(request: BayesianContinuousRequest):
+async def bayesian_continuous(request: BayesianContinuousRequest) -> dict[str, Any]:
     """Bayesian analysis for continuous metrics."""
     result = normal_analysis(
         control_mean=request.control_mean,
@@ -58,9 +60,9 @@ async def bayesian_continuous(request: BayesianContinuousRequest):
     return _serialize_result(result)
 
 
-def _serialize_result(result: dict) -> dict:
+def _serialize_result(result: dict[str, Any]) -> dict[str, Any]:
     """Convert dataclass results to serializable dicts."""
-    serialized = {}
+    serialized: dict[str, Any] = {}
     for key, value in result.items():
         if hasattr(value, "__dict__"):
             serialized[key] = {

@@ -1,0 +1,145 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../../lib/api";
+
+interface SegmentVariantRow {
+  variant_key: string;
+  sample_size: number;
+  conversions: number;
+  conversion_rate: number | null;
+}
+
+interface SegmentRow {
+  segment: string;
+  total_sample_size: number;
+  variants: SegmentVariantRow[];
+}
+
+interface SegmentResponse {
+  data: {
+    attribute: string;
+    metric_key: string;
+    metric_name: string;
+    note: string;
+    segments: SegmentRow[];
+  };
+}
+
+const SUGGESTED_ATTRIBUTES = ["country", "device"];
+
+export function SegmentBreakdownCard({ experimentId }: { experimentId: string }) {
+  const [attributeInput, setAttributeInput] = useState("country");
+  const [attribute, setAttribute] = useState<string | null>(null);
+
+  const { data, isFetching, isError } = useQuery<SegmentResponse>({
+    queryKey: ["segments", experimentId, attribute],
+    queryFn: () =>
+      api.get<SegmentResponse>(
+        `/api/v1/experiments/${experimentId}/segments?attribute=${encodeURIComponent(attribute!)}`,
+      ),
+    enabled: !!attribute,
+  });
+
+  const segments = data?.data.segments ?? [];
+  const variantKeys = segments[0]?.variants.map((v) => v.variant_key) ?? [];
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Segment Breakdown</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Descriptive split by assignment attribute — not significance-tested.
+          </p>
+        </div>
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (attributeInput.trim()) setAttribute(attributeInput.trim());
+          }}
+        >
+          <input
+            type="text"
+            value={attributeInput}
+            onChange={(event) => setAttributeInput(event.target.value)}
+            list="segment-attributes"
+            placeholder="attribute (e.g. country)"
+            className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs w-40"
+          />
+          <datalist id="segment-attributes">
+            {SUGGESTED_ATTRIBUTES.map((suggestion) => (
+              <option key={suggestion} value={suggestion} />
+            ))}
+          </datalist>
+          <button
+            type="submit"
+            disabled={!attributeInput.trim() || isFetching}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {isFetching ? "Loading..." : "Break down"}
+          </button>
+        </form>
+      </div>
+
+      {!attribute ? (
+        <div className="px-6 py-6 text-center text-sm text-gray-500">
+          Pick an attribute your SDK sends with /v1/assign (e.g. country, device) to see
+          per-segment results.
+        </div>
+      ) : isError ? (
+        <div className="px-6 py-6 text-center text-sm text-red-600">
+          Couldn't load segments for "{attribute}".
+        </div>
+      ) : segments.length === 0 ? (
+        !isFetching && (
+          <div className="px-6 py-6 text-center text-sm text-gray-500">
+            No assignments recorded yet, so there's nothing to segment.
+          </div>
+        )
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50/50 border-b border-gray-100">
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                  {data?.data.attribute}
+                </th>
+                {variantKeys.map((key) => (
+                  <th
+                    key={key}
+                    className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase"
+                  >
+                    {key}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {segments.map((segment) => (
+                <tr key={segment.segment} className="hover:bg-gray-50/50">
+                  <td className="px-6 py-3 font-medium text-gray-900">
+                    {segment.segment}
+                    <span className="ml-2 text-xs text-gray-400">
+                      n={segment.total_sample_size.toLocaleString()}
+                    </span>
+                  </td>
+                  {segment.variants.map((variant) => (
+                    <td key={variant.variant_key} className="px-6 py-3 text-right text-gray-700">
+                      {variant.conversion_rate != null
+                        ? `${(variant.conversion_rate * 100).toFixed(1)}%`
+                        : "—"}
+                      <span className="ml-1 text-xs text-gray-400">
+                        ({variant.conversions}/{variant.sample_size})
+                      </span>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

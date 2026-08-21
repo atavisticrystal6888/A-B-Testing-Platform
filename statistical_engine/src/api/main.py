@@ -4,11 +4,14 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.routes import analysis, bayesian, health, power
+
+CallNext = Callable[[Request], Awaitable[Response]]
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -40,7 +43,7 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def auth_middleware(request: Request, call_next):
+async def auth_middleware(request: Request, call_next: CallNext) -> Response:
     """Internal service-to-service auth via X-Internal-Key header."""
     # Health check bypasses auth
     if request.url.path.endswith("/health"):
@@ -60,7 +63,7 @@ async def auth_middleware(request: Request, call_next):
 
 
 @app.middleware("http")
-async def timing_middleware(request: Request, call_next):
+async def timing_middleware(request: Request, call_next: CallNext) -> Response:
     """Add server timing header."""
     start = time.perf_counter()
     response: Response = await call_next(request)
@@ -70,7 +73,7 @@ async def timing_middleware(request: Request, call_next):
 
 
 @app.middleware("http")
-async def trace_context_middleware(request: Request, call_next):
+async def trace_context_middleware(request: Request, call_next: CallNext) -> Response:
     """W3C Trace Context propagation (Constitution Art.IX)."""
     traceparent = request.headers.get("traceparent", "")
     tracestate = request.headers.get("tracestate", "")

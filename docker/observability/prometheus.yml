@@ -1,0 +1,19 @@
+# Prometheus scrape config for the ExperimentHub release stack
+# (used by the `observability` compose profile).
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Phoenix serves Prometheus text format on GET /metrics
+  # (ExperimentHubWeb.MetricsController, unauthenticated by design —
+  # only reachable on the compose network unless you publish :4000).
+  - job_name: experiment-hub-web
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["experiment-hub-web:4000"]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

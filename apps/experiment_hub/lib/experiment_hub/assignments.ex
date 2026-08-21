@@ -91,7 +91,7 @@ defmodule ExperimentHub.Assignments do
 
   # Private assignment logic
 
-  defp do_assign(tenant_id, experiment, user_id, _attributes) do
+  defp do_assign(tenant_id, experiment, user_id, attributes) do
     # 1. Check for override
     case get_override(tenant_id, experiment.id, user_id) do
       {:ok, override} ->
@@ -107,12 +107,12 @@ defmodule ExperimentHub.Assignments do
 
           {:error, :not_found} ->
             # 3. Hash-based assignment
-            hash_and_persist(tenant_id, experiment, user_id)
+            hash_and_persist(tenant_id, experiment, user_id, attributes)
         end
     end
   end
 
-  defp hash_and_persist(tenant_id, experiment, user_id) do
+  defp hash_and_persist(tenant_id, experiment, user_id, attributes) do
     sorted_variants = Enum.sort_by(experiment.variants, & &1.sort_order)
     allocations = Enum.map(sorted_variants, & &1.traffic_allocation)
 
@@ -128,12 +128,13 @@ defmodule ExperimentHub.Assignments do
 
     variant = Enum.at(sorted_variants, variant_index) || List.first(sorted_variants)
 
-    # Persist to prevent flip-flop
+    # Persist to prevent flip-flop; context enables segmented result views.
     AssignmentPersistence.persist(%{
       tenant_id: tenant_id,
       experiment_id: experiment.id,
       variant_id: variant.id,
-      user_id: user_id
+      user_id: user_id,
+      context: attributes
     })
 
     {:ok, r} = build_result(experiment, variant, user_id, tenant_id, true, "hash")

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 from scipy import stats
 
@@ -53,7 +54,7 @@ def evaluate_sequential(
     information_fraction: float,
     overall_alpha: float = 0.05,
     spending_function: str = "obrien_fleming",
-) -> dict:
+) -> dict[str, Any]:
     """
     Evaluate whether to reject the null at the current interim analysis.
 

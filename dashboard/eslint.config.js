@@ -20,6 +20,7 @@ export default [
         clearTimeout: "readonly",
         console: "readonly",
         HTMLFormElement: "readonly",
+        Blob: "readonly",
       },
       parser: tsParser,
       parserOptions: {

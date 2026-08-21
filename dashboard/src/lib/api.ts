@@ -114,6 +114,46 @@ export const api = {
 };
 
 /**
+ * Hands a Blob to the browser as a file download. The anchor is attached
+ * to the DOM before clicking and the object URL revoked on a macrotask —
+ * clicking a detached anchor and revoking synchronously races the download
+ * in Firefox/Safari.
+ */
+export function triggerBlobDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/**
+ * Fetches `path` with auth headers and hands the response to the browser
+ * as a file download. Needed because plain `window.open` can't send the
+ * Authorization header (exports 401) and bypasses the runtime API base.
+ */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const response = await fetch(buildApiUrl(path), { headers: getAuthHeaders() });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new ApiError(
+      response.status,
+      errorBody,
+      `API error: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const filename = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? fallbackName;
+
+  triggerBlobDownload(await response.blob(), filename);
+}
+
+/**
  * Extracts a human-readable message from an API error. Handles the
  * FallbackController's changeset shape ({error, errors: {field: [msg]}})
  * and single-message error shapes ({error, message}); falls back to a

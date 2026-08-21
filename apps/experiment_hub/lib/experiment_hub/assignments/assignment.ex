@@ -15,13 +15,14 @@ defmodule ExperimentHub.Assignments.Assignment do
     field(:experiment_id, :binary_id)
     field(:variant_id, :binary_id)
     field(:user_id, :string)
+    field(:context, :map, default: %{})
 
     field(:assigned_at, :utc_datetime)
   end
 
   def changeset(assignment, attrs) do
     assignment
-    |> cast(attrs, [:tenant_id, :experiment_id, :variant_id, :user_id, :assigned_at])
+    |> cast(attrs, [:tenant_id, :experiment_id, :variant_id, :user_id, :context, :assigned_at])
     |> validate_required([:tenant_id, :experiment_id, :variant_id, :user_id])
     |> put_assigned_at()
     |> validate_length(:user_id, max: 255)

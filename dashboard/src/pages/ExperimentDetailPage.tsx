@@ -7,6 +7,8 @@ import { useDetachMetric } from "../hooks/useExperimentMetrics";
 import { useWebSocket } from "../contexts/WebSocketContext";
 import { ConcludeModal } from "../components/experiments/ConcludeModal";
 import { AttachMetricModal } from "../components/experiments/AttachMetricModal";
+import { ExportMenu } from "../components/experiments/ExportMenu";
+import { SegmentBreakdownCard } from "../components/experiments/SegmentBreakdownCard";
 import type { AnalysisResults, ConclusionDecision, Experiment, MetricResult } from "../lib/types";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
@@ -321,6 +323,16 @@ export default function ExperimentDetailPage() {
       {/* Attached Metrics */}
       <div className="mt-6">
         <AttachedMetricsCard experiment={experiment} />
+      </div>
+
+      {/* Segment breakdown */}
+      <div className="mt-6">
+        <SegmentBreakdownCard experimentId={experiment.id} />
+      </div>
+
+      {/* Readout + raw data exports */}
+      <div className="mt-6 flex justify-end">
+        <ExportMenu experiment={experiment} results={results} />
       </div>
 
       {!hasAnalysisResults && (

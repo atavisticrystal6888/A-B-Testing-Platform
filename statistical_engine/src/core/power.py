@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 from scipy import stats
 
@@ -13,7 +14,7 @@ def sample_size_proportions(
     power: float = 0.80,
     num_variants: int = 2,
     correction_method: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """
     Calculate required sample size per variant for a two-proportion z-test.
 
@@ -58,7 +59,7 @@ def sample_size_continuous(
     significance_level: float = 0.05,
     power: float = 0.80,
     num_variants: int = 2,
-) -> dict:
+) -> dict[str, Any]:
     """Calculate required sample size for continuous metric comparison."""
     z_alpha = stats.norm.ppf(1 - significance_level / 2)
     z_beta = stats.norm.ppf(power)

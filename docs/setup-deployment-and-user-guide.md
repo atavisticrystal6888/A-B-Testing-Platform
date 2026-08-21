@@ -547,15 +547,41 @@ Recommended routing shape remains:
 
 The dashboard container also proxies `/health` to Phoenix, which is the simplest public health endpoint for the bundled stack.
 
-#### Step 8: Add operational hardening
+#### Step 8: Optional bundled observability and backups
+
+Two opt-in compose profiles ship with the release stack:
+
+Metrics and dashboards (Prometheus scraping the Phoenix `/metrics` endpoint, plus Grafana with a pre-provisioned "ExperimentHub Overview" dashboard — request rate/latency, per-route traffic, DB query latency, BEAM memory):
+
+```bash
+docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml --profile observability up -d
+```
+
+Grafana is at `http://127.0.0.1:3001` (credentials from `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD` in release.env), Prometheus at `http://127.0.0.1:9090`.
+
+Nightly logical backups of the bundled Postgres (gzipped `pg_dump` into `BACKUP_DIR`, pruned after `BACKUP_KEEP_DAYS`):
+
+```bash
+docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml --profile backup up -d
+```
+
+Restore a backup into the running Postgres:
+
+```bash
+gunzip -c backups/experiment_hub_dev-<stamp>.sql.gz | \
+  docker compose --env-file release.env -f docker-compose.yml -f docker-compose.release.yml exec -T postgres \
+  psql -U experimenthub -d experiment_hub_dev
+```
+
+#### Step 9: Add operational hardening
 
 For a serious deployment, also add:
 
 - TLS termination
 - Process supervision or service management
-- Database backups
+- Off-host backup shipping (the backup profile writes to a local directory)
 - Log aggregation
-- Metrics and uptime monitoring
+- Uptime monitoring
 - Secret rotation
 - Managed Postgres, Redis, and Kafka or equivalent persistent infrastructure
 
@@ -724,6 +750,8 @@ If the experiment is running or paused and Phoenix has Oban plus the statistical
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:4000/api/v1/experiments/PUT-EXPERIMENT-ID-HERE/analyze -Headers @{ Authorization = "Bearer $token" }
 ```
 
+Analysis is computed from the experiment's real assignments and ingested events (sample sizes are distinct assigned users; conversions are distinct users with a matching event). If no assignments or events have been recorded yet, the analysis reports "insufficient data" rather than numbers.
+
 Then open the experiment detail page to inspect:
 
 - Variant performance
@@ -733,6 +761,12 @@ Then open the experiment detail page to inspect:
 - Confidence interval chart
 - Conversion-over-time chart
 - Guardrail breaches, when present
+- Segment breakdown — split results by any attribute your SDK sends with `/v1/assign` (e.g. country, device). Descriptive only: per-segment differences are not significance-tested.
+
+You can also share results from the detail page:
+
+- `Download Readout` generates a self-contained HTML summary (print to PDF for stakeholders) from the current results, entirely in the browser.
+- `Export CSV` / `Export JSON` download the raw daily results via the authenticated export API.
 
 ### Step 10: Pause, resume, or conclude the experiment
 

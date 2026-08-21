@@ -59,6 +59,7 @@ defmodule ExperimentHubWeb.Router do
     get "/experiment-groups", ExperimentGroupController, :index
     get "/experiment-groups/:id", ExperimentGroupController, :show
     get "/experiments/:experiment_id/metrics", ExperimentMetricController, :index
+    get "/experiments/:experiment_id/segments", SegmentController, :index
 
     # Feature flags
     get "/flags", FeatureFlagController, :index

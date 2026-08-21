@@ -26,6 +26,19 @@ class GuardrailDirection(str, Enum):
     BELOW = "below"
 
 
+class VariantStatsInput(BaseModel):
+    """Real per-variant counts aggregated by the caller (Elixir) from
+    assignments and events. sum_value/sum_squared_value are totals over
+    matching events, letting continuous metrics derive mean/variance over
+    the assigned population (non-converters contribute zero)."""
+
+    variant_key: str
+    sample_size: int = 0
+    conversions: int = 0
+    sum_value: float = 0.0
+    sum_squared_value: float = 0.0
+
+
 class MetricInput(BaseModel):
     metric_definition_id: str
     metric_key: str
@@ -33,6 +46,7 @@ class MetricInput(BaseModel):
     role: MetricRole
     guardrail_threshold: Optional[float] = None
     guardrail_direction: Optional[GuardrailDirection] = None
+    variant_stats: list[VariantStatsInput] = Field(default_factory=list)
 
 
 class VariantInput(BaseModel):
@@ -89,7 +103,7 @@ class BayesianPosterior(BaseModel):
 
 class BayesianResult(BaseModel):
     model: str
-    prior: dict
+    prior: dict[str, float]
     posteriors: dict[str, BayesianPosterior]
     probability_to_be_best: dict[str, float]
     credible_interval: ConfidenceInterval

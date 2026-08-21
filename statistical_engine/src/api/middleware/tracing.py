@@ -3,7 +3,7 @@
 import logging
 import uuid
 
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class TraceContextMiddleware(BaseHTTPMiddleware):
     """Extract/inject W3C Trace Context headers (traceparent/tracestate)."""
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Extract incoming trace context
         traceparent = request.headers.get("traceparent")
         tracestate = request.headers.get("tracestate", "")
