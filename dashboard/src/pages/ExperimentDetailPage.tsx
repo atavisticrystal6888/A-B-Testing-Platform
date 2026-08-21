@@ -9,6 +9,7 @@ import { ConcludeModal } from "../components/experiments/ConcludeModal";
 import { AttachMetricModal } from "../components/experiments/AttachMetricModal";
 import { ExportMenu } from "../components/experiments/ExportMenu";
 import { SegmentBreakdownCard } from "../components/experiments/SegmentBreakdownCard";
+import { DecisionPanel } from "../components/experiments/DecisionPanel";
 import type { AnalysisResults, ConclusionDecision, Experiment, MetricResult } from "../lib/types";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
@@ -311,6 +312,9 @@ export default function ExperimentDetailPage() {
           onCancel={() => setIsConcludeModalOpen(false)}
         />
       )}
+
+      {/* Plain-language decision */}
+      <DecisionPanel experiment={experiment} results={results} />
 
       {/* Stats Cards */}
       {primaryMetric && <SignificanceCard metric={primaryMetric} />}

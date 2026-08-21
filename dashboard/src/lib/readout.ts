@@ -7,6 +7,105 @@
 import { triggerBlobDownload } from "./api";
 import type { AnalysisResults, Experiment, MetricResult, VariantStats } from "./types";
 
+export interface Decision {
+  state: "ship" | "do_not_ship" | "keep_collecting" | "no_effect";
+  headline: string;
+  detail: string;
+}
+
+function findPrimaryMetric(results: AnalysisResults): MetricResult | undefined {
+  return results.metrics.find((m) => m.role === "primary");
+}
+
+function resolveWinnerName(experiment: Experiment, metric: MetricResult): string {
+  const winningVariant = metric.recommendation?.winning_variant;
+  if (winningVariant) {
+    const match = experiment.variants.find(
+      (v) => v.key === winningVariant || v.name === winningVariant || v.id === winningVariant,
+    );
+    if (match) return match.name;
+    return winningVariant;
+  }
+
+  const fallback = experiment.variants.find((v) => !v.is_control);
+  return fallback?.name ?? "the treatment variant";
+}
+
+function breachedMetricNames(results: AnalysisResults): string[] {
+  const fromList = results.guardrail_breaches ?? [];
+  const fromMetrics = results.metrics
+    .filter((m) => m.guardrail_status?.is_breached)
+    .map((m) => m.metric_key);
+  return Array.from(new Set([...fromList, ...fromMetrics]));
+}
+
+/**
+ * Translates a primary metric's statistical result into a plain-language
+ * ship / hold / keep-collecting recommendation. Presentation only — derives
+ * no new statistics, just reads what the statistical engine already computed.
+ */
+export function deriveDecision(experiment: Experiment, results: AnalysisResults): Decision | null {
+  const primary = findPrimaryMetric(results);
+  const freq = primary?.frequentist;
+  if (!primary || !freq) return null;
+
+  const breached = breachedMetricNames(results);
+  if (breached.length > 0) {
+    return {
+      state: "do_not_ship",
+      headline: "Do not ship",
+      detail: `Guardrail breach on ${breached.join(", ")}.`,
+    };
+  }
+
+  if (freq.is_significant) {
+    if (freq.effect_size.relative > 0) {
+      const winner = resolveWinnerName(experiment, primary);
+      return {
+        state: "ship",
+        headline: `Ship ${winner}`,
+        detail: `${primary.metric_key} improved by ${pct(freq.effect_size.relative, 1)} (p=${freq.p_value.toFixed(3)}), with no guardrail breaches.`,
+      };
+    }
+
+    return {
+      state: "do_not_ship",
+      headline: "Do not ship",
+      detail: `The primary metric regressed significantly (p=${freq.p_value.toFixed(3)}).`,
+    };
+  }
+
+  const ssc = primary.sample_size_calculation;
+  const underpowered = ssc ? ssc.is_sufficient === false : freq.power_achieved < 0.8;
+
+  if (underpowered) {
+    const sampleDetail = ssc
+      ? ` Collected ${ssc.current_total.toLocaleString()} of ${ssc.minimum_required.toLocaleString()} required samples.`
+      : ` Statistical power is ${Math.round(freq.power_achieved * 100)}%, below the 80% target.`;
+    return {
+      state: "keep_collecting",
+      headline: "Keep collecting data",
+      detail: `Not enough data yet to reach a confident conclusion.${sampleDetail}`,
+    };
+  }
+
+  return {
+    state: "no_effect",
+    headline: "No detectable effect",
+    detail: `${primary.metric_key} shows no statistically significant difference, and the experiment has adequate statistical power.`,
+  };
+}
+
+function decisionBannerHtml(decision: Decision | null): string {
+  if (!decision) return "";
+
+  return `<section class="decision ${decision.state}">
+    <p class="decision-label">Recommendation</p>
+    <p class="decision-headline">${esc(decision.headline)}</p>
+    <p class="decision-detail">${esc(decision.detail)}</p>
+  </section>`;
+}
+
 function esc(value: unknown): string {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -92,6 +191,9 @@ export function buildReadoutHtml(experiment: Experiment, results?: AnalysisResul
         </section>`
       : "";
 
+  const decision = results ? deriveDecision(experiment, results) : null;
+  const decisionBanner = decisionBannerHtml(decision);
+
   const metricSections = results?.metrics?.length
     ? results.metrics.map((metric) => metricSection(experiment, metric)).join("\n")
     : `<section><p class="note">No analysis results are available yet for this experiment.</p></section>`;
@@ -118,6 +220,14 @@ export function buildReadoutHtml(experiment: Experiment, results?: AnalysisResul
   dt { color: #718096; font-size: 0.75rem; text-transform: uppercase; }
   dd { margin: 0; font-weight: 600; }
   .note { font-size: 0.9rem; color: #4a5568; background: #f7fafc; border-left: 3px solid #cbd5e0; padding: 0.5rem 0.75rem; }
+  .decision { margin: 1.25rem 0; padding: 1rem 1.25rem; border-radius: 0.5rem; border-left: 4px solid; }
+  .decision-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; margin: 0 0 0.25rem; opacity: 0.8; }
+  .decision-headline { font-size: 1.15rem; font-weight: 700; margin: 0 0 0.25rem; }
+  .decision-detail { font-size: 0.9rem; margin: 0; }
+  .decision.ship { background: #c6f6d5; border-color: #38a169; color: #22543d; }
+  .decision.do_not_ship { background: #fed7d7; border-color: #e53e3e; color: #822727; }
+  .decision.keep_collecting { background: #feebc8; border-color: #dd6b20; color: #7b341e; }
+  .decision.no_effect { background: #edf2f7; border-color: #a0aec0; color: #4a5568; }
   @media print { body { margin: 0.5rem auto; } }
 </style>
 </head>
@@ -125,6 +235,7 @@ export function buildReadoutHtml(experiment: Experiment, results?: AnalysisResul
 <h1>${esc(experiment.name)}</h1>
 <p class="meta">${esc(experiment.key)} · status: ${esc(experiment.status)} · readout generated ${esc(generated)}</p>
 ${experiment.hypothesis ? `<p><strong>Hypothesis:</strong> ${esc(experiment.hypothesis)}</p>` : ""}
+${decisionBanner}
 ${conclusion}
 ${metricSections}
 <p class="meta">Generated by ExperimentHub${results ? ` from analysis computed at ${esc(new Date(results.computed_at).toLocaleString())}` : ""}.</p>
