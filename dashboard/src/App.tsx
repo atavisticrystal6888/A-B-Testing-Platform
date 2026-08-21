@@ -9,6 +9,7 @@ const Layout = lazy(() => import("./pages/Layout"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ExperimentListPage = lazy(() => import("./pages/ExperimentListPage"));
 const ExperimentDetailPage = lazy(() => import("./pages/ExperimentDetailPage"));
+const ExperimentTimelinePage = lazy(() => import("./pages/ExperimentTimelinePage"));
 const CreateExperimentPage = lazy(() =>
   import("./pages/CreateExperimentPage").then((module) => ({ default: module.CreateExperimentPage })),
 );
@@ -72,6 +73,7 @@ export default function App() {
                       <Route path="/experiments" element={<ExperimentListPage />} />
                       <Route path="/experiments/new" element={<CreateExperimentPage />} />
                       <Route path="/experiments/:id" element={<ExperimentDetailPage />} />
+                      <Route path="/experiments/:id/timeline" element={<ExperimentTimelinePage />} />
                       <Route path="/flags" element={<FeatureFlagsPage />} />
                       <Route path="/metrics" element={<MetricDefinitionsPage />} />
                       <Route path="/audit-logs" element={<AuditLogPage />} />

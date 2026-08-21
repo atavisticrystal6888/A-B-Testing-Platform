@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConcludeExperiment, useExperiment, useExperimentAction } from "../hooks/useExperiments";
 import { useExperimentResults } from "../hooks/useResults";
@@ -264,6 +264,12 @@ export default function ExperimentDetailPage() {
           )}
         </div>
         <div className="flex gap-2">
+          <Link
+            to={`/experiments/${id}/timeline`}
+            className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Timeline
+          </Link>
           {experiment.status === "draft" && (
             <button
               onClick={() => startAction.mutate(id!)}

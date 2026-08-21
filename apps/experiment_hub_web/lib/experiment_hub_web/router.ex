@@ -71,6 +71,9 @@ defmodule ExperimentHubWeb.Router do
     get "/experiments/:experiment_id/audit-logs", AuditLogController, :index
     get "/audit-logs", AuditLogController, :tenant_index
 
+    # Timeline (lifecycle audit events + daily exposure counts)
+    get "/experiments/:experiment_id/timeline", TimelineController, :show
+
     # Analytics
     get "/analytics/overview", AnalyticsController, :overview
 

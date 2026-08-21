@@ -208,6 +208,23 @@ export interface AnalysisResults {
   guardrail_breaches: string[];
 }
 
+export interface LifecycleEvent {
+  action: string;
+  at: string;
+  actor_type: string;
+  reason?: string | null;
+}
+
+export interface DailyExposure {
+  date: string;
+  count: number;
+}
+
+export interface ExperimentTimeline {
+  lifecycle: LifecycleEvent[];
+  daily_exposures: DailyExposure[];
+}
+
 export interface AssignmentResult {
   experiment_key: string;
   variant_key: string;
