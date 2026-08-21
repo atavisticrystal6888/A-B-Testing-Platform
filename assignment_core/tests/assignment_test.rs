@@ -44,6 +44,35 @@ proptest! {
 }
 
 #[test]
+fn golden_vectors_pin_bucketing() {
+    // (experiment_key, user_id, bucket) — must stay identical to
+    // apps/assignment_engine/test/assignment_engine/native_test.exs and
+    // examples/golden_vectors.rs. Any change to the seed, separator, or
+    // murmur variant re-buckets every user; these assertions make that
+    // drift fail here instead of only in the Elixir suite.
+    let vectors: [(&str, &str, u32); 8] = [
+        ("exp-1", "user-1", 5323),
+        ("exp-1", "user-2", 8042),
+        ("checkout-cta", "manual-e2e-user-001", 7539),
+        ("exp-unicode", "üser-ñ", 8924),
+        ("exp-long", "a-rather-long-user-identifier-0123456789", 5607),
+        ("e", "u", 1959),
+        ("exp-1", "", 9129),
+        ("", "user-1", 8154),
+    ];
+
+    for (experiment_key, user_id, expected) in vectors {
+        assert_eq!(
+            hash_to_bucket(user_id, experiment_key),
+            expected,
+            "bucket mismatch for ({:?}, {:?})",
+            experiment_key,
+            user_id
+        );
+    }
+}
+
+#[test]
 fn distribution_is_roughly_uniform() {
     let mut counts = [0u32; 2];
     let n = 100_000;
