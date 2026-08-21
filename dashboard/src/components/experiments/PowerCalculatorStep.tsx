@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 
 interface PowerCalculatorStepProps {
   numVariants: number;
@@ -16,10 +16,58 @@ interface PowerEstimateResponse {
   data: PowerEstimateData;
 }
 
+/**
+ * Validates the baseline-rate input (as a %). The engine's PowerRequest
+ * enforces `baseline_rate` strictly between 0 and 1 (see
+ * statistical_engine/src/models/power.py), so an empty, non-numeric, or
+ * out-of-range value is rejected here before it ever reaches the engine —
+ * a 422 from the engine reads as "the engine is down" if it gets that far.
+ */
+function validateBaselineRate(value: string): string | undefined {
+  if (value.trim() === '') {
+    return 'Baseline conversion rate is required.';
+  }
+
+  const parsed = Number.parseFloat(value);
+
+  if (!Number.isFinite(parsed)) {
+    return 'Enter a valid number.';
+  }
+
+  if (parsed <= 0 || parsed >= 100) {
+    return 'Must be between 0% and 100%.';
+  }
+
+  return undefined;
+}
+
+/** Validates the MDE input (as a relative %); the engine requires > 0. */
+function validateMde(value: string): string | undefined {
+  if (value.trim() === '') {
+    return 'Minimum detectable effect is required.';
+  }
+
+  const parsed = Number.parseFloat(value);
+
+  if (!Number.isFinite(parsed)) {
+    return 'Enter a valid number.';
+  }
+
+  if (parsed <= 0) {
+    return 'Must be greater than 0%.';
+  }
+
+  return undefined;
+}
+
 export function PowerCalculatorStep({ numVariants }: PowerCalculatorStepProps) {
   const [baselineRate, setBaselineRate] = useState('5');
   const [mde, setMde] = useState('10');
   const [power, setPower] = useState<80 | 90>(80);
+
+  const baselineRateError = validateBaselineRate(baselineRate);
+  const mdeError = validateMde(mde);
+  const isValid = !baselineRateError && !mdeError;
 
   const calculatePower = useMutation({
     mutationFn: () =>
@@ -56,8 +104,11 @@ export function PowerCalculatorStep({ numVariants }: PowerCalculatorStepProps) {
             step="0.1"
             value={baselineRate}
             onChange={(e) => setBaselineRate(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+              baselineRateError ? 'border-red-300 bg-red-50' : 'border-gray-300'
+            }`}
           />
+          {baselineRateError && <p className="mt-1 text-xs text-red-600">{baselineRateError}</p>}
         </div>
         <div>
           <label htmlFor="power-mde" className="block text-xs font-medium text-gray-600 mb-1">
@@ -70,8 +121,11 @@ export function PowerCalculatorStep({ numVariants }: PowerCalculatorStepProps) {
             step="0.1"
             value={mde}
             onChange={(e) => setMde(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+              mdeError ? 'border-red-300 bg-red-50' : 'border-gray-300'
+            }`}
           />
+          {mdeError && <p className="mt-1 text-xs text-red-600">{mdeError}</p>}
         </div>
       </div>
 
@@ -103,8 +157,12 @@ export function PowerCalculatorStep({ numVariants }: PowerCalculatorStepProps) {
 
       <button
         type="button"
-        onClick={() => calculatePower.mutate()}
-        disabled={calculatePower.isPending}
+        onClick={() => {
+          if (isValid) {
+            calculatePower.mutate();
+          }
+        }}
+        disabled={!isValid || calculatePower.isPending}
         className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
       >
         {calculatePower.isPending ? 'Calculating...' : 'Calculate'}
@@ -112,7 +170,9 @@ export function PowerCalculatorStep({ numVariants }: PowerCalculatorStepProps) {
 
       {calculatePower.isError && (
         <p className="text-xs text-red-600">
-          Couldn&apos;t calculate a sample size right now. Please try again.
+          {calculatePower.error instanceof ApiError && calculatePower.error.status === 422
+            ? 'Check your inputs and try again.'
+            : "Couldn't calculate a sample size right now. Please try again."}
         </p>
       )}
 

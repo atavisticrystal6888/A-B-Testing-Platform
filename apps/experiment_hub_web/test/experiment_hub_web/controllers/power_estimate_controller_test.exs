@@ -107,7 +107,7 @@ defmodule ExperimentHubWeb.PowerEstimateControllerTest do
       assert response["data"]["estimated_days"] == nil
     end
 
-    test "returns 502 when the statistical engine errors", %{conn: conn} do
+    test "returns 502 when the statistical engine has a server error (5xx)", %{conn: conn} do
       Req.Test.stub(@stub_name, fn conn ->
         Plug.Conn.send_resp(conn, 500, Jason.encode!(%{"detail" => "internal error"}))
       end)
@@ -121,6 +121,33 @@ defmodule ExperimentHubWeb.PowerEstimateControllerTest do
 
       response = json_response(conn, 502)
       assert response["error"] == "bad_gateway"
+    end
+
+    test "returns 422 (not 502) when the engine rejects the input (4xx)", %{conn: conn} do
+      # e.g. baseline_rate/mde out of the engine's Pydantic-validated range —
+      # this must read as "fix your inputs", not "the engine is down".
+      Req.Test.stub(@stub_name, fn conn ->
+        Plug.Conn.send_resp(
+          conn,
+          422,
+          Jason.encode!(%{
+            "detail" => [
+              %{"loc" => ["body", "baseline_rate"], "msg" => "ensure this value is > 0"}
+            ]
+          })
+        )
+      end)
+
+      conn =
+        post(conn, "/api/v1/power-estimate", %{
+          "baseline_rate" => 0,
+          "mde" => 0.10,
+          "num_variants" => 2
+        })
+
+      response = json_response(conn, 422)
+      assert response["error"] == "invalid_input"
+      refute response["error"] == "bad_gateway"
     end
   end
 end

@@ -113,4 +113,46 @@ describe('CreateExperimentPage — Power calculator wizard step', () => {
     expect(await screen.findByText(/800 users per variant/)).toBeInTheDocument();
     expect(screen.queryByText(/days/)).not.toBeInTheDocument();
   });
+
+  it('disables Calculate and shows an inline error when a required field is cleared', async () => {
+    render(<CreateExperimentPage />, { wrapper: createWrapper() });
+
+    fireEvent.change(screen.getByPlaceholderText('Checkout Button Color'), {
+      target: { value: 'Test Experiment' },
+    });
+    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByText('Next'));
+
+    await screen.findByText('Power Calculator');
+
+    fireEvent.change(screen.getByLabelText('Baseline conversion rate (%)'), {
+      target: { value: '' },
+    });
+
+    expect(await screen.findByText(/baseline conversion rate is required/i)).toBeInTheDocument();
+    expect(screen.getByText('Calculate')).toBeDisabled();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('rejects an out-of-range baseline rate and keeps Calculate disabled', async () => {
+    render(<CreateExperimentPage />, { wrapper: createWrapper() });
+
+    fireEvent.change(screen.getByPlaceholderText('Checkout Button Color'), {
+      target: { value: 'Test Experiment' },
+    });
+    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByText('Next'));
+
+    await screen.findByText('Power Calculator');
+
+    fireEvent.change(screen.getByLabelText('Baseline conversion rate (%)'), {
+      target: { value: '150' },
+    });
+
+    expect(await screen.findByText(/between 0% and 100%/i)).toBeInTheDocument();
+    expect(screen.getByText('Calculate')).toBeDisabled();
+    expect(api.post).not.toHaveBeenCalled();
+  });
 });

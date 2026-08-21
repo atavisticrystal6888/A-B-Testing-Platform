@@ -56,6 +56,16 @@ defmodule ExperimentHubWeb.PowerEstimateController do
           }
         })
 
+      {:ok, %{status: status, body: body}} when status in 400..499 ->
+        # The engine's Pydantic validation rejected the request (e.g.
+        # baseline_rate/mde out of range) — this is a bad-input problem, not
+        # an outage, so it must not read as "the engine is down".
+        Logger.warning(
+          "Power estimate: engine rejected the request (#{status}): #{inspect(body)}"
+        )
+
+        invalid_input(conn)
+
       {:ok, %{status: status, body: body}} ->
         Logger.error("Power estimate: engine returned #{status}: #{inspect(body)}")
         bad_gateway(conn)
@@ -64,6 +74,15 @@ defmodule ExperimentHubWeb.PowerEstimateController do
         Logger.error("Power estimate: engine unreachable: #{inspect(reason)}")
         bad_gateway(conn)
     end
+  end
+
+  defp invalid_input(conn) do
+    conn
+    |> put_status(422)
+    |> json(%{
+      error: "invalid_input",
+      message: "Check your inputs and try again."
+    })
   end
 
   defp bad_gateway(conn) do
