@@ -10,6 +10,7 @@ import { AttachMetricModal } from "../components/experiments/AttachMetricModal";
 import { ExportMenu } from "../components/experiments/ExportMenu";
 import { SegmentBreakdownCard } from "../components/experiments/SegmentBreakdownCard";
 import { DecisionPanel } from "../components/experiments/DecisionPanel";
+import { SrmWarningBanner } from "../components/experiments/SrmWarningBanner";
 import type { AnalysisResults, ConclusionDecision, Experiment, MetricResult } from "../lib/types";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
@@ -312,6 +313,9 @@ export default function ExperimentDetailPage() {
           onCancel={() => setIsConcludeModalOpen(false)}
         />
       )}
+
+      {/* SRM diagnostics */}
+      <SrmWarningBanner experiment={experiment} results={results} />
 
       {/* Plain-language decision */}
       <DecisionPanel experiment={experiment} results={results} />
