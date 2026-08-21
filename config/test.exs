@@ -48,6 +48,12 @@ config :experiment_hub,
   # background during a test run.
   start_oban: true
 
+# Routes PowerEstimateController's Req call to a Req.Test stub instead of a
+# real statistical engine over HTTP. Unset in dev/prod, where the plug option
+# is absent and Req.post makes a genuine network call (same as AnalysisWorker).
+config :experiment_hub_web,
+  stat_engine_req_options: [plug: {Req.Test, ExperimentHubWeb.PowerEstimateController.StatEngine}]
+
 config :experiment_hub, Oban, testing: :manual, queues: false, plugins: false
 
 # Kafka stays OFF in unit tests: no brokers means Kafka.Client starts as

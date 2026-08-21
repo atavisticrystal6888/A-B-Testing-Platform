@@ -77,6 +77,9 @@ defmodule ExperimentHubWeb.Router do
     # Analytics
     get "/analytics/overview", AnalyticsController, :overview
 
+    # Power calculator (pre-launch sample-size estimate; read-only proxy)
+    post "/power-estimate", PowerEstimateController, :create
+
     # Export
     get "/experiments/:experiment_id/export", ExportController, :export_experiment
     get "/experiments/:experiment_id/export/results", ExportController, :export_results

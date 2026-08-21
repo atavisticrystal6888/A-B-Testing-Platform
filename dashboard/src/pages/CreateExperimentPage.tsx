@@ -4,6 +4,7 @@ import { useCreateExperiment } from '../hooks/useExperiments';
 import { TargetingRuleBuilder } from '../components/experiments/TargetingRuleBuilder';
 import { ScheduleForm } from '../components/experiments/ScheduleForm';
 import { MutualExclusionGroupSelect } from '../components/experiments/MutualExclusionGroupSelect';
+import { PowerCalculatorStep } from '../components/experiments/PowerCalculatorStep';
 import { ApiError } from '../lib/api';
 
 interface Variant {
@@ -21,7 +22,7 @@ interface TargetingRule {
 
 type FieldErrors = Record<string, string>;
 
-const steps = ['Hypothesis', 'Variants', 'Traffic', 'Settings'];
+const steps = ['Hypothesis', 'Variants', 'Traffic', 'Power', 'Settings'];
 const keyPattern = /^[a-z0-9][a-z0-9_-]*[a-z0-9]$|^[a-z0-9]$/;
 
 function slugifyExperimentKey(value: string): string {
@@ -90,7 +91,7 @@ function getFieldStep(field: string): number {
     field === 'targeting_rules' ||
     field === 'experiment_group_id'
   ) {
-    return 4;
+    return 5;
   }
 
   return 1;
@@ -624,8 +625,32 @@ export function CreateExperimentPage() {
         </div>
       )}
 
-      {/* Step 4: Settings */}
+      {/* Step 4: Power (optional — skippable via Next) */}
       {step === 4 && (
+        <div className="space-y-4">
+          <PowerCalculatorStep numVariants={variants.length} />
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setStep(3);
+                setValidationErrors({});
+              }}
+              className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg"
+            >
+              Back
+            </button>
+            <button
+              onClick={() => handleNextStep(5)}
+              className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 5: Settings */}
+      {step === 5 && (
         <div className="space-y-6">
           <ScheduleForm
             scheduledStartAt={scheduledStartAt}
@@ -668,7 +693,7 @@ export function CreateExperimentPage() {
           <div className="flex gap-3">
             <button
               onClick={() => {
-                setStep(3);
+                setStep(4);
                 setValidationErrors({});
               }}
               className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg"

@@ -58,6 +58,27 @@ defmodule ExperimentHub.Analytics do
     end)
   end
 
+  @doc """
+  Tenant-wide assignments-per-day over the trailing `window_days` (default 7),
+  across all experiments. Used by the pre-launch power calculator to turn a
+  required sample size into an estimated day count; returns 0.0 when the
+  tenant has no assignments in the window (the caller treats that as "no
+  recent traffic").
+  """
+  def recent_assignment_rate(tenant_id, window_days \\ 7) do
+    window_start = DateTime.add(DateTime.utc_now(), -window_days, :day)
+
+    count =
+      from(a in Assignment,
+        where: a.tenant_id == ^tenant_id,
+        where: a.assigned_at >= ^window_start,
+        select: count(a.id)
+      )
+      |> Repo.one() || 0
+
+    count / window_days
+  end
+
   defp assignment_stats(tenant_id) do
     start_of_today = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
 
