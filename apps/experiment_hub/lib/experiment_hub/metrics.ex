@@ -5,7 +5,7 @@ defmodule ExperimentHub.Metrics do
 
   import Ecto.Query
   alias ExperimentHub.Repo
-  alias ExperimentHub.Metrics.{MetricDefinition, ExperimentMetric}
+  alias ExperimentHub.Metrics.{MetricDefinition, ExperimentMetric, StatisticalAnalysis}
 
   # --- Metric Definitions ---
 
@@ -97,6 +97,51 @@ defmodule ExperimentHub.Metrics do
     case Repo.get(ExperimentMetric, id) do
       nil -> {:error, :not_found}
       experiment_metric -> Repo.delete(experiment_metric)
+    end
+  end
+
+  @doc """
+  Days-to-significance projection for each experiment's primary metric, read
+  from the latest persisted `StatisticalAnalysis`. Returns
+  `%{experiment_id => projection_map | nil}`, nil-safe throughout (missing
+  primary metric, no persisted analysis yet, or an analysis predating this
+  feature all resolve to nil rather than raising).
+
+  Runs exactly two queries regardless of how many experiment_ids are passed,
+  so callers rendering a page of experiments avoid an N+1 per row.
+  """
+  def latest_primary_projections([]), do: %{}
+
+  def latest_primary_projections(experiment_ids) when is_list(experiment_ids) do
+    primary_metric_ids =
+      ExperimentMetric
+      |> where([em], em.experiment_id in ^experiment_ids and em.role == "primary")
+      |> select([em], {em.experiment_id, em.metric_definition_id})
+      |> Repo.all()
+      |> Map.new()
+
+    if primary_metric_ids == %{} do
+      %{}
+    else
+      exp_ids = Map.keys(primary_metric_ids)
+
+      latest_analysis_by_key =
+        StatisticalAnalysis
+        |> where([sa], sa.experiment_id in ^exp_ids)
+        |> order_by([sa], desc: sa.computed_at)
+        |> Repo.all()
+        |> Enum.group_by(&{&1.experiment_id, &1.metric_definition_id})
+        |> Map.new(fn {key, [latest | _]} -> {key, latest} end)
+
+      Map.new(primary_metric_ids, fn {experiment_id, metric_definition_id} ->
+        projection =
+          case Map.get(latest_analysis_by_key, {experiment_id, metric_definition_id}) do
+            nil -> nil
+            analysis -> get_in(analysis.results, ["projection"])
+          end
+
+        {experiment_id, projection}
+      end)
     end
   end
 end

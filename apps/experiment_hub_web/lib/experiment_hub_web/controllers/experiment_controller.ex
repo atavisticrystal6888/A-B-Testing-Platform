@@ -2,6 +2,7 @@ defmodule ExperimentHubWeb.ExperimentController do
   use ExperimentHubWeb, :controller
 
   alias ExperimentHub.Experiments
+  alias ExperimentHub.Metrics
 
   action_fallback ExperimentHubWeb.FallbackController
 
@@ -9,10 +10,12 @@ defmodule ExperimentHubWeb.ExperimentController do
     tenant_id = conn.assigns.tenant_id
 
     %{data: experiments, meta: meta} = Experiments.list_experiments(tenant_id, params)
+    # One extra pair of queries for the whole page, not one per experiment.
+    projections = Metrics.latest_primary_projections(Enum.map(experiments, & &1.id))
 
     conn
     |> put_status(200)
-    |> render(:index, experiments: experiments, meta: meta)
+    |> render(:index, experiments: experiments, meta: meta, projections: projections)
   end
 
   def show(conn, %{"id" => id}) do

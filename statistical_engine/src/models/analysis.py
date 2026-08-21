@@ -62,6 +62,10 @@ class AnalysisConfig(BaseModel):
     sequential_analysis: bool = False
     spending_function: Optional[str] = "obrien_fleming"
     analysis_types: list[str] = Field(default_factory=lambda: ["frequentist"])
+    # Observed assignments/day, supplied by the caller (Elixir). Optional and
+    # back-compat: omitting it (or leaving it non-positive) simply skips the
+    # days-to-significance projection rather than affecting anything else.
+    exposure_rate_per_day: Optional[float] = None
 
 
 class AnalysisRequest(BaseModel):
@@ -152,6 +156,13 @@ class GuardrailStatus(BaseModel):
     is_breached: bool
 
 
+class ProjectionResult(BaseModel):
+    """Days-to-significance estimate (Roadmap #4). Never a calendar date."""
+
+    status: str
+    days_remaining: Optional[int] = None
+
+
 class MetricResult(BaseModel):
     metric_key: str
     metric_type: Optional[str] = None
@@ -163,6 +174,7 @@ class MetricResult(BaseModel):
     sample_size_calculation: Optional[SampleSizeCalc] = None
     recommendation: Optional[Recommendation] = None
     guardrail_status: Optional[GuardrailStatus] = None
+    projection: Optional[ProjectionResult] = None
 
 
 class AnalysisResponse(BaseModel):

@@ -1,7 +1,10 @@
 """Contract tests for the Statistical Engine API endpoints."""
+import math
+
 from fastapi.testclient import TestClient
 
 from src.api.main import app
+from src.core.power import sample_size_proportions
 
 client = TestClient(app)
 
@@ -80,6 +83,70 @@ class TestAnalyzeEndpoint:
         assert abs(freq["effect_size"]["relative"] - 0.5) < 1e-9
         assert metric["recommendation"]["action"] == "significant_winner"
         assert metric["recommendation"]["winning_variant"] == "treatment"
+
+        # Back-compat: no exposure_rate_per_day in the request -> no projection.
+        assert metric["projection"] is None
+
+    def test_analyze_with_exposure_rate_adds_projection(self):
+        # Same shape as the baseline case above, but under-powered (1000/arm)
+        # so there's a real remaining requirement to project against.
+        stats = [
+            {"variant_key": "control", "sample_size": 1000, "conversions": 100},
+            {"variant_key": "treatment", "sample_size": 1000, "conversions": 150},
+        ]
+        config = {
+            "significance_level": 0.05,
+            "power": 0.80,
+            "analysis_types": ["frequentist"],
+            "exposure_rate_per_day": 200,
+        }
+
+        response = client.post(
+            "/stats/v1/analyze/550e8400-e29b-41d4-a716-446655440000",
+            json=_payload([_primary_metric(stats)], config=config),
+            headers=INTERNAL_KEY_HEADER,
+        )
+        assert response.status_code == 200
+        metric = response.json()["metrics"][0]
+
+        assert metric["sample_size_calculation"]["is_sufficient"] is False
+
+        ss_calc = sample_size_proportions(
+            baseline_rate=0.10,
+            minimum_detectable_effect=0.02,
+            significance_level=0.05,
+            power=0.80,
+        )
+        required_total = ss_calc["sample_size_per_variant"] * 2
+        expected_days = math.ceil((required_total - 2000) / 200)
+
+        projection = metric["projection"]
+        assert projection is not None
+        assert projection["status"] == "estimate"
+        assert projection["days_remaining"] == expected_days
+
+    def test_analyze_secondary_metric_gets_no_projection(self):
+        # Projection is primary-only, even with a positive exposure rate.
+        stats = [
+            {"variant_key": "control", "sample_size": 1000, "conversions": 100},
+            {"variant_key": "treatment", "sample_size": 1000, "conversions": 150},
+        ]
+        metric = _primary_metric(stats)
+        metric["role"] = "secondary"
+        config = {
+            "significance_level": 0.05,
+            "power": 0.80,
+            "analysis_types": ["frequentist"],
+            "exposure_rate_per_day": 200,
+        }
+
+        response = client.post(
+            "/stats/v1/analyze/550e8400-e29b-41d4-a716-446655440000",
+            json=_payload([metric], config=config),
+            headers=INTERNAL_KEY_HEADER,
+        )
+        assert response.status_code == 200
+        assert response.json()["metrics"][0]["projection"] is None
 
     def test_analyze_without_stats_reports_insufficient_data(self):
         # No variant_stats provided: the engine must NOT invent numbers.

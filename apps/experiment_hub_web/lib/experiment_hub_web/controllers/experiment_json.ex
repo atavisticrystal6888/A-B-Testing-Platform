@@ -5,9 +5,9 @@ defmodule ExperimentHubWeb.ExperimentJSON do
 
   alias ExperimentHub.Experiments.Experiment
 
-  def index(%{experiments: experiments, meta: meta}) do
+  def index(%{experiments: experiments, meta: meta, projections: projections}) do
     %{
-      data: Enum.map(experiments, &experiment_summary/1),
+      data: Enum.map(experiments, &experiment_summary(&1, projections)),
       meta: meta
     }
   end
@@ -33,7 +33,7 @@ defmodule ExperimentHubWeb.ExperimentJSON do
     }
   end
 
-  defp experiment_summary(experiment) do
+  defp experiment_summary(experiment, projections) do
     %{
       id: experiment.id,
       key: experiment.key,
@@ -42,7 +42,8 @@ defmodule ExperimentHubWeb.ExperimentJSON do
       feature_tag: experiment.feature_tag,
       variant_count: length(loaded_list(experiment.variants)),
       started_at: experiment.started_at,
-      inserted_at: experiment.inserted_at
+      inserted_at: experiment.inserted_at,
+      days_to_significance: Map.get(projections, experiment.id)
     }
   end
 

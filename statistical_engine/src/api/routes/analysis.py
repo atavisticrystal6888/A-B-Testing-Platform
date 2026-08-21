@@ -10,6 +10,7 @@ from fastapi import APIRouter
 
 from src.core.frequentist import FrequentistTestResult, welchs_t_test, z_test_proportions
 from src.core.power import sample_size_proportions
+from src.core.projection import project_days_to_significance
 from src.core.sequential import evaluate_sequential
 from src.models.analysis import (
     AnalysisRequest,
@@ -20,7 +21,9 @@ from src.models.analysis import (
     GuardrailStatus,
     MetricInput,
     MetricResult,
+    MetricRole,
     MetricType,
+    ProjectionResult,
     Recommendation,
     SampleSizeCalc,
     SequentialResult,
@@ -227,6 +230,20 @@ def _analyze_metric(metric: MetricInput, request: AnalysisRequest) -> MetricResu
             significance_level=request.config.significance_level,
         )
 
+    # Days-to-significance projection (Roadmap #4): primary metrics only,
+    # and only when the caller supplied a positive exposure rate — omitting
+    # exposure_rate_per_day must leave the response byte-identical to today.
+    projection = None
+    if metric.role == MetricRole.PRIMARY and (request.config.exposure_rate_per_day or 0) > 0:
+        minimum_required = sample_size_result.minimum_required if sample_size_result else None
+        proj = project_days_to_significance(
+            minimum_required_per_variant=minimum_required,
+            current_total=control_n + treatment_n,
+            num_variants=2,
+            exposure_rate_per_day=request.config.exposure_rate_per_day,
+        )
+        projection = ProjectionResult(**proj)
+
     # Sequential analysis if configured and a sample-size target exists
     sequential = None
     if request.config.sequential_analysis and sample_size_result:
@@ -316,6 +333,7 @@ def _analyze_metric(metric: MetricInput, request: AnalysisRequest) -> MetricResu
         sequential=sequential,
         sample_size_calculation=sample_size_result,
         recommendation=recommendation,
+        projection=projection,
     )
 
 

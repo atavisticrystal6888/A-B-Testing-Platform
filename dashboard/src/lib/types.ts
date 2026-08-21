@@ -58,6 +58,12 @@ export interface ExperimentMetricSummary {
   guardrail_direction?: "above" | "below";
 }
 
+/** Days-to-significance estimate (Roadmap #4). Never a calendar date. */
+export interface ProjectionResult {
+  status: "estimate" | "may_never" | "insufficient_data";
+  days_remaining: number | null;
+}
+
 export interface ExperimentSummary {
   id: string;
   key: string;
@@ -67,6 +73,7 @@ export interface ExperimentSummary {
   variant_count: number;
   started_at?: string;
   inserted_at: string;
+  days_to_significance?: ProjectionResult | null;
 }
 
 export interface Experiment {
@@ -196,6 +203,7 @@ export interface MetricResult {
     current_value: number;
     is_breached: boolean;
   };
+  projection?: ProjectionResult | null;
 }
 
 export interface AnalysisResults {

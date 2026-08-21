@@ -11,7 +11,7 @@ import { ExportMenu } from "../components/experiments/ExportMenu";
 import { SegmentBreakdownCard } from "../components/experiments/SegmentBreakdownCard";
 import { DecisionPanel } from "../components/experiments/DecisionPanel";
 import { SrmWarningBanner } from "../components/experiments/SrmWarningBanner";
-import type { AnalysisResults, ConclusionDecision, Experiment, MetricResult } from "../lib/types";
+import type { AnalysisResults, ConclusionDecision, Experiment, MetricResult, ProjectionResult } from "../lib/types";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
   primary: "bg-indigo-100 text-indigo-700",
@@ -202,6 +202,27 @@ function SignificanceCard({ metric }: { metric: MetricResult }) {
   );
 }
 
+/** "~N days" / "may never reach significance..." — never a calendar date. */
+function ProjectionLine({ projection }: { projection: ProjectionResult }) {
+  if (projection.status === "estimate" && projection.days_remaining != null) {
+    return (
+      <p className="text-sm text-gray-600">
+        {"⏱"} ~{projection.days_remaining} days until significance at current traffic
+      </p>
+    );
+  }
+
+  if (projection.status === "may_never") {
+    return (
+      <p className="text-sm text-gray-600">
+        {"⏱"} may never reach significance at current traffic
+      </p>
+    );
+  }
+
+  return null;
+}
+
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [isConcludeModalOpen, setIsConcludeModalOpen] = useState(false);
@@ -328,6 +349,11 @@ export default function ExperimentDetailPage() {
 
       {/* Stats Cards */}
       {primaryMetric && <SignificanceCard metric={primaryMetric} />}
+      {primaryMetric?.projection && experiment.status === "running" && (
+        <div className="mt-2">
+          <ProjectionLine projection={primaryMetric.projection} />
+        </div>
+      )}
 
       {/* Variant Table */}
       <div className="mt-6">

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useExperiments } from "../hooks/useExperiments";
-import type { ExperimentStatus, ExperimentSummary } from "../lib/types";
+import type { ExperimentStatus, ExperimentSummary, ProjectionResult } from "../lib/types";
 
 const STATUS_COLORS: Record<ExperimentStatus, string> = {
   draft: "bg-gray-100 text-gray-700",
@@ -18,6 +18,16 @@ function StatusBadge({ status }: { status: ExperimentStatus }) {
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );
+}
+
+/** Compact form of the same projection: "~16d" / "may never" / "—". */
+function formatProjection(projection: ProjectionResult | null | undefined): string {
+  if (!projection) return "—";
+  if (projection.status === "estimate" && projection.days_remaining != null) {
+    return `~${projection.days_remaining}d`;
+  }
+  if (projection.status === "may_never") return "may never";
+  return "—";
 }
 
 export default function ExperimentListPage() {
@@ -109,6 +119,9 @@ export default function ExperimentListPage() {
                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Created
                 </th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Time to significance
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -136,6 +149,9 @@ export default function ExperimentListPage() {
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     {new Date(exp.inserted_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {formatProjection(exp.days_to_significance)}
                   </td>
                 </tr>
               ))}

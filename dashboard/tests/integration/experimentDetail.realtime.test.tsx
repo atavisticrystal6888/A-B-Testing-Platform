@@ -250,6 +250,10 @@ describe("Experiment detail realtime rendering", () => {
                   action: "insufficient_data",
                   message: "Only 2000 of 7678 required samples collected. Continue running.",
                 },
+                projection: {
+                  status: "estimate",
+                  days_remaining: 16,
+                },
                 variants: [
                   {
                     variant_key: "control",
@@ -289,6 +293,10 @@ describe("Experiment detail realtime rendering", () => {
     expect(await screen.findByRole("button", { name: "Pause" })).toBeInTheDocument();
     expect(screen.getByText("Statistical Significance")).toBeInTheDocument();
     expect(screen.getByText("Only 2000 of 7678 required samples collected. Continue running.")).toBeInTheDocument();
+    // Roadmap #4: days-to-significance projection line, running experiments only.
+    expect(
+      screen.getByText("⏱ ~16 days until significance at current traffic"),
+    ).toBeInTheDocument();
     // Charts are lazy-loaded, so wait for the chunk to resolve.
     expect(await screen.findByText("Confidence Interval Chart")).toBeInTheDocument();
     expect(await screen.findByText("Conversion Rate Over Time")).toBeInTheDocument();

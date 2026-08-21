@@ -5,14 +5,22 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
   """
   use Oban.Worker, queue: :analysis, max_attempts: 3
 
+  import Ecto.Query
+
   require Logger
 
   alias ExperimentHub.Repo
+  alias ExperimentHub.Assignments.Assignment
   alias ExperimentHub.Experiments
   alias ExperimentHub.Metrics
   alias ExperimentHub.Metrics.StatisticalAnalysis
   alias ExperimentHub.Notifications
   alias ExperimentHub.Workers.GuardrailWorker
+
+  # Product call: a 7-day trailing window (or since started_at, for a
+  # younger experiment) is a reasonable, low-noise estimate of current
+  # traffic without needing a dedicated telemetry pipeline.
+  @exposure_window_days 7
 
   @impl Oban.Worker
   def perform(%Oban.Job{
@@ -34,8 +42,39 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
   defp run_analysis(experiment, tenant_id, trace_id) do
     metrics = Metrics.list_experiment_metrics(experiment.id)
     experiment = Repo.preload(experiment, :variants)
+    request_body = build_analysis_request(experiment, tenant_id, metrics)
 
-    request_body = %{
+    headers = [
+      {"content-type", "application/json"},
+      {"x-internal-key", internal_api_key()},
+      {"traceparent", "00-#{trace_id}-#{generate_span_id()}-01"}
+    ]
+
+    case Req.post("#{stat_engine_url()}/stats/v1/analyze/#{experiment.id}",
+           json: request_body,
+           headers: headers,
+           receive_timeout: 30_000
+         ) do
+      {:ok, %{status: 200, body: body}} ->
+        store_results(body, experiment, tenant_id, metrics)
+        :ok
+
+      {:ok, %{status: status, body: body}} ->
+        Logger.error("Analysis API returned #{status}: #{inspect(body)}")
+        {:error, "Analysis API error: #{status}"}
+
+      {:error, reason} ->
+        Logger.error("Analysis API call failed: #{inspect(reason)}")
+        {:error, "Analysis API unreachable"}
+    end
+  end
+
+  @doc false
+  # Builds the /stats/v1/analyze request body. Exposed (not `defp`) so its
+  # shape — in particular the computed exposure_rate_per_day — can be
+  # asserted on directly without exercising the HTTP call.
+  def build_analysis_request(experiment, tenant_id, metrics) do
+    %{
       tenant_id: tenant_id,
       experiment_id: experiment.id,
       metrics:
@@ -68,33 +107,10 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
         power: 0.80,
         sequential_analysis: true,
         spending_function: "obrien_fleming",
-        analysis_types: ["frequentist"]
+        analysis_types: ["frequentist"],
+        exposure_rate_per_day: exposure_rate_per_day(experiment)
       }
     }
-
-    headers = [
-      {"content-type", "application/json"},
-      {"x-internal-key", internal_api_key()},
-      {"traceparent", "00-#{trace_id}-#{generate_span_id()}-01"}
-    ]
-
-    case Req.post("#{stat_engine_url()}/stats/v1/analyze/#{experiment.id}",
-           json: request_body,
-           headers: headers,
-           receive_timeout: 30_000
-         ) do
-      {:ok, %{status: 200, body: body}} ->
-        store_results(body, experiment, tenant_id, metrics)
-        :ok
-
-      {:ok, %{status: status, body: body}} ->
-        Logger.error("Analysis API returned #{status}: #{inspect(body)}")
-        {:error, "Analysis API error: #{status}"}
-
-      {:error, reason} ->
-        Logger.error("Analysis API call failed: #{inspect(reason)}")
-        {:error, "Analysis API unreachable"}
-    end
   end
 
   defp store_results(body, experiment, tenant_id, metrics) do
@@ -196,6 +212,46 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
   defp metric_methodology(%{"sequential" => _sequential}), do: "sequential_analysis"
   defp metric_methodology(%{"guardrail_status" => _guardrail_status}), do: "guardrail_threshold"
   defp metric_methodology(_metric_result), do: "z_test_proportions"
+
+  @doc false
+  # Assignments/day over a trailing window: the last @exposure_window_days
+  # days, or since the experiment started if it's younger than that (a
+  # partial window undercounts less than pretending 7 full days elapsed).
+  # Exposed (not `defp`) so the rate calculation can be unit-tested without
+  # exercising the HTTP call to the statistical engine.
+  def exposure_rate_per_day(experiment) do
+    now = DateTime.utc_now()
+    earliest_window_start = DateTime.add(now, -@exposure_window_days, :day)
+
+    window_start =
+      case experiment.started_at do
+        %DateTime{} = started_at ->
+          if DateTime.compare(started_at, earliest_window_start) == :gt do
+            started_at
+          else
+            earliest_window_start
+          end
+
+        _ ->
+          earliest_window_start
+      end
+
+    window_days = DateTime.diff(now, window_start, :second) / 86_400
+
+    if window_days <= 0 do
+      0.0
+    else
+      count =
+        Repo.one(
+          from(a in Assignment,
+            where: a.experiment_id == ^experiment.id and a.assigned_at >= ^window_start,
+            select: count(a.id)
+          )
+        ) || 0
+
+      count / window_days
+    end
+  end
 
   defp stat_engine_url do
     Application.get_env(:experiment_hub, :stat_engine_url, "http://localhost:8000")

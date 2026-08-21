@@ -149,6 +149,56 @@ defmodule ExperimentHubWeb.ExperimentControllerTest do
       assert length(response["data"]) == 2
       assert response["meta"]["page"] == 1
       assert response["meta"]["total_count"] == 2
+
+      # No persisted analysis yet -> nil-safe, but the key is always present.
+      for row <- response["data"] do
+        assert Map.has_key?(row, "days_to_significance")
+        assert row["days_to_significance"] == nil
+      end
+    end
+
+    test "surfaces the primary metric's projection as days_to_significance", %{
+      conn: conn,
+      tenant: tenant
+    } do
+      experiment = create_experiment(conn, "projection-test", "Projection Test")
+
+      {:ok, metric_def} =
+        Metrics.create_metric_definition(%{
+          "tenant_id" => tenant.id,
+          "key" => "projection-metric",
+          "name" => "Projection Metric",
+          "metric_type" => "count",
+          "definition" => %{"event_name" => "test"}
+        })
+
+      {:ok, _} =
+        Metrics.attach_metric(%{
+          "tenant_id" => tenant.id,
+          "experiment_id" => experiment["id"],
+          "metric_definition_id" => metric_def.id,
+          "role" => "primary"
+        })
+
+      {:ok, _analysis} =
+        %ExperimentHub.Metrics.StatisticalAnalysis{}
+        |> ExperimentHub.Metrics.StatisticalAnalysis.changeset(%{
+          tenant_id: tenant.id,
+          experiment_id: experiment["id"],
+          metric_definition_id: metric_def.id,
+          analysis_type: "frequentist",
+          methodology: "z_test_proportions",
+          parameters: %{},
+          results: %{"projection" => %{"status" => "estimate", "days_remaining" => 16}},
+          sample_sizes: %{}
+        })
+        |> Repo.insert()
+
+      conn = get(conn, "/api/v1/experiments")
+      response = json_response(conn, 200)
+
+      row = Enum.find(response["data"], &(&1["key"] == "projection-test"))
+      assert row["days_to_significance"] == %{"status" => "estimate", "days_remaining" => 16}
     end
 
     test "filters by status", %{conn: conn, tenant: tenant} do
