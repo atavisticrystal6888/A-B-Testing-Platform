@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import type { ConclusionDecision, Variant } from "../../lib/types";
 
 interface ConcludeModalProps {
@@ -21,14 +22,14 @@ export function ConcludeModal({
   const [decision, setDecision] = useState<ConclusionDecision | "">("");
   const [rationale, setRationale] = useState("");
   const [winnerVariantId, setWinnerVariantId] = useState("");
-  const panelRef = useRef<HTMLDivElement>(null);
+  const panelRef = useFocusTrap<HTMLDivElement>();
 
   useEffect(() => {
     const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
     firstFocusable?.focus();
-  }, []);
+  }, [panelRef]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {

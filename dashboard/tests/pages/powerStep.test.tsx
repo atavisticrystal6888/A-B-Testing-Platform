@@ -135,6 +135,39 @@ describe('CreateExperimentPage — Power calculator wizard step', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
+  it('groups the desired-power radios in a fieldset with a legend, and announces the result in a live region', async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        sample_size_per_variant: 1200,
+        total_sample_size: 2400,
+        estimated_days: 5,
+      },
+    });
+
+    render(<CreateExperimentPage />, { wrapper: createWrapper() });
+
+    fireEvent.change(screen.getByPlaceholderText('Checkout Button Color'), {
+      target: { value: 'Test Experiment' },
+    });
+    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByText('Next'));
+
+    await screen.findByText('Power Calculator');
+
+    const legend = screen.getByText('Desired power');
+    expect(legend.tagName).toBe('LEGEND');
+    expect(legend.closest('fieldset')).not.toBeNull();
+
+    const statusRegion = screen.getByRole('status');
+    expect(statusRegion).toHaveAttribute('aria-live', 'polite');
+
+    fireEvent.click(screen.getByText('Calculate'));
+
+    expect(await screen.findByText(/1,200 users per variant/)).toBeInTheDocument();
+    expect(statusRegion).toContainElement(screen.getByText(/1,200 users per variant/));
+  });
+
   it('rejects an out-of-range baseline rate and keeps Calculate disabled', async () => {
     render(<CreateExperimentPage />, { wrapper: createWrapper() });
 

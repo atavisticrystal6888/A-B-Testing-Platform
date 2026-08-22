@@ -37,7 +37,7 @@ export function getApiBaseUrl(): string {
     return window.location.origin;
   }
 
-  return "http://localhost:4000";
+  return "http://127.0.0.1:4000";
 }
 
 export function buildApiUrl(path: string): string {

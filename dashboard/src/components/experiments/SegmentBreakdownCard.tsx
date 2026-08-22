@@ -34,7 +34,10 @@ const COHORT_CHIPS: { label: string; attribute: string }[] = [
 ];
 
 export function SegmentBreakdownCard({ experimentId }: { experimentId: string }) {
-  const [attributeInput, setAttributeInput] = useState("country");
+  // Kept separate from `attribute` (the active query key) so that clicking a
+  // canned cohort chip never clobbers whatever the user typed into the
+  // custom field — reopening "Custom…" should still show their own text.
+  const [customAttributeInput, setCustomAttributeInput] = useState("country");
   const [attribute, setAttribute] = useState<string | null>(null);
   const [showCustomInput, setShowCustomInput] = useState(false);
 
@@ -79,7 +82,6 @@ export function SegmentBreakdownCard({ experimentId }: { experimentId: string })
                 type="button"
                 onClick={() => {
                   setShowCustomInput(false);
-                  setAttributeInput(chip.attribute);
                   setAttribute(chip.attribute);
                 }}
                 className={chipClass(!showCustomInput && attribute === chip.attribute)}
@@ -100,13 +102,13 @@ export function SegmentBreakdownCard({ experimentId }: { experimentId: string })
               className="flex items-center gap-2"
               onSubmit={(event) => {
                 event.preventDefault();
-                if (attributeInput.trim()) setAttribute(attributeInput.trim());
+                if (customAttributeInput.trim()) setAttribute(customAttributeInput.trim());
               }}
             >
               <input
                 type="text"
-                value={attributeInput}
-                onChange={(event) => setAttributeInput(event.target.value)}
+                value={customAttributeInput}
+                onChange={(event) => setCustomAttributeInput(event.target.value)}
                 list="segment-attributes"
                 placeholder="attribute (e.g. country)"
                 className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs w-40"
@@ -118,7 +120,7 @@ export function SegmentBreakdownCard({ experimentId }: { experimentId: string })
               </datalist>
               <button
                 type="submit"
-                disabled={!attributeInput.trim() || isFetching}
+                disabled={!customAttributeInput.trim() || isFetching}
                 className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
               >
                 {isFetching ? "Loading..." : "Break down"}

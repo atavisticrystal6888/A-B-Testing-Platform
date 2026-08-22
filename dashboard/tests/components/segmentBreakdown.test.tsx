@@ -120,6 +120,35 @@ describe('SegmentBreakdownCard — cohort chips', () => {
     expect(screen.getByPlaceholderText('attribute (e.g. country)')).toBeInTheDocument();
   });
 
+  it('keeps a typed custom attribute intact after a cohort chip click, so reopening Custom… shows it unchanged', () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: { attribute: 'country', metric_key: 'k', metric_name: 'n', note: '', segments: [] },
+    });
+
+    render(<SegmentBreakdownCard experimentId="exp-1" />, { wrapper: createWrapper() });
+
+    fireEvent.click(screen.getByText('Custom…'));
+    const input = screen.getByPlaceholderText('attribute (e.g. country)');
+    fireEvent.change(input, { target: { value: 'plan_tier' } });
+    fireEvent.click(screen.getByText('Break down'));
+
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/experiments/exp-1/segments?attribute=plan_tier',
+    );
+
+    // Clicking a canned chip switches the active query away from the
+    // custom attribute...
+    fireEvent.click(screen.getByText('Country'));
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/experiments/exp-1/segments?attribute=country',
+    );
+
+    // ...but reopening Custom… must still show what was typed, not the
+    // chip's attribute.
+    fireEvent.click(screen.getByText('Custom…'));
+    expect(screen.getByPlaceholderText('attribute (e.g. country)')).toHaveValue('plan_tier');
+  });
+
   it('shows the permanent descriptive-only badge in the header', () => {
     render(<SegmentBreakdownCard experimentId="exp-1" />, { wrapper: createWrapper() });
 

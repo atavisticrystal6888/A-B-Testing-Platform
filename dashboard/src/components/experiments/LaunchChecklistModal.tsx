@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { evaluateChecklist, type ChecklistStatus } from "../../lib/launchChecklist";
 import type { Experiment, ExperimentTimeline } from "../../lib/types";
 
@@ -32,7 +33,7 @@ export function LaunchChecklistModal({
   onCancel,
 }: LaunchChecklistModalProps) {
   const [confirmingOverride, setConfirmingOverride] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const panelRef = useFocusTrap<HTMLDivElement>();
 
   const { data: timelineResponse } = useQuery<{ data: ExperimentTimeline }>({
     queryKey: ["timeline", experiment.id],
@@ -45,7 +46,7 @@ export function LaunchChecklistModal({
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
     firstFocusable?.focus();
-  }, []);
+  }, [panelRef]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -60,7 +61,9 @@ export function LaunchChecklistModal({
 
   const items = evaluateChecklist(experiment, timelineResponse?.data);
   const hasFail = items.some((item) => item.status === "fail");
-  const unmetCount = items.filter((item) => item.status !== "pass").length;
+  // "unknown" items are advisory only and never block a start, so they don't
+  // count toward the override confirmation — only genuine failures do.
+  const unmetCount = items.filter((item) => item.status === "fail").length;
   const overrideLabel = `Start with ${unmetCount} unmet check${unmetCount === 1 ? "" : "s"}?`;
 
   return (

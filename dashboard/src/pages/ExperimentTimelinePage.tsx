@@ -83,7 +83,15 @@ export default function ExperimentTimelinePage() {
   if (!experiment || !timeline) {
     return (
       <div className="p-8">
-        <ErrorState message="Experiment not found." />
+        <EmptyState
+          title="Experiment not found"
+          hint="It may have been deleted, or the link may be out of date."
+          cta={
+            <Link to="/experiments" className="text-indigo-600 hover:text-indigo-700 font-medium">
+              Back to experiments
+            </Link>
+          }
+        />
       </div>
     );
   }

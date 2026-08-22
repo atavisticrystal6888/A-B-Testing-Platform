@@ -129,8 +129,8 @@ export function PowerCalculatorStep({ numVariants }: PowerCalculatorStepProps) {
         </div>
       </div>
 
-      <div>
-        <span className="block text-xs font-medium text-gray-600 mb-1">Desired power</span>
+      <fieldset className="m-0 border-0 p-0">
+        <legend className="block text-xs font-medium text-gray-600 mb-1">Desired power</legend>
         <div className="flex gap-4">
           <label htmlFor="power-80" className="flex items-center gap-1.5 text-sm text-gray-700">
             <input
@@ -153,7 +153,7 @@ export function PowerCalculatorStep({ numVariants }: PowerCalculatorStepProps) {
             90%
           </label>
         </div>
-      </div>
+      </fieldset>
 
       <button
         type="button"
@@ -168,28 +168,30 @@ export function PowerCalculatorStep({ numVariants }: PowerCalculatorStepProps) {
         {calculatePower.isPending ? 'Calculating...' : 'Calculate'}
       </button>
 
-      {calculatePower.isError && (
-        <p className="text-xs text-red-600">
-          {calculatePower.error instanceof ApiError && calculatePower.error.status === 422
-            ? 'Check your inputs and try again.'
-            : "Couldn't calculate a sample size right now. Please try again."}
-        </p>
-      )}
-
-      {result && (
-        <div className="p-4 bg-white rounded-lg border border-indigo-100 text-sm text-gray-700">
-          <p>
-            You need <strong>{result.sample_size_per_variant.toLocaleString()} users per variant</strong>{' '}
-            ({result.total_sample_size.toLocaleString()} total).
-            {result.estimated_days !== null && (
-              <>
-                {' '}
-                At your current traffic that&apos;s <strong>~{result.estimated_days} days</strong>.
-              </>
-            )}
+      <div role="status" aria-live="polite">
+        {calculatePower.isError && (
+          <p className="text-xs text-red-600">
+            {calculatePower.error instanceof ApiError && calculatePower.error.status === 422
+              ? 'Check your inputs and try again.'
+              : "Couldn't calculate a sample size right now. Please try again."}
           </p>
-        </div>
-      )}
+        )}
+
+        {result && (
+          <div className="p-4 bg-white rounded-lg border border-indigo-100 text-sm text-gray-700">
+            <p>
+              You need <strong>{result.sample_size_per_variant.toLocaleString()} users per variant</strong>{' '}
+              ({result.total_sample_size.toLocaleString()} total).
+              {result.estimated_days !== null && (
+                <>
+                  {' '}
+                  At your current traffic that&apos;s <strong>~{result.estimated_days} days</strong>.
+                </>
+              )}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -88,6 +88,32 @@ describe("InfoTip", () => {
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
   });
 
+  it("stays open when the popover's own text is clicked, but still closes when blur goes elsewhere", () => {
+    render(
+      <div>
+        <InfoTip term="p_value" />
+        <button>elsewhere</button>
+      </div>,
+    );
+
+    const button = screen.getByRole("button", { name: "What is p-value?" });
+    fireEvent.click(button);
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toBeInTheDocument();
+
+    // Clicking the popover's own (non-focusable) text fires a mousedown on
+    // it followed by a native blur on the button — the pinned tip must
+    // survive that.
+    fireEvent.mouseDown(tooltip);
+    fireEvent.blur(button);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+
+    // A later, unrelated blur (focus genuinely moving elsewhere) still
+    // closes it.
+    fireEvent.blur(button);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
   it("closes on mouseleave when only opened by hover", () => {
     render(<InfoTip term="p_value" />);
     const button = screen.getByRole("button", { name: "What is p-value?" });

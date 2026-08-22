@@ -173,6 +173,19 @@ export default function Layout() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [mobileOpen]);
 
+  // Lock background scroll while the mobile drawer is open, restoring
+  // whatever inline overflow value (if any) was there before.
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
+
   const closeMobile = useCallback(() => setMobileOpen(false), []);
   const items = [...navItems, ...(user?.role === "admin" ? adminNavItems : [])];
 

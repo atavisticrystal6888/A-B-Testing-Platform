@@ -7,18 +7,28 @@ import ConversionOverTimeChart from '../../src/components/charts/ConversionOverT
 // jsdom's getBoundingClientRect always returns all-zero dimensions, so
 // recharts' <ResponsiveContainer> (which measures its container with it on
 // mount, before rendering any children) never mounts the chart — scoped to
-// this file only, since no other suite renders recharts.
-Element.prototype.getBoundingClientRect = vi.fn(() => ({
-  width: 600,
-  height: 250,
-  top: 0,
-  left: 0,
-  bottom: 250,
-  right: 600,
-  x: 0,
-  y: 0,
-  toJSON() {},
-}));
+// this file only, since no other suite renders recharts. Only the
+// ResponsiveContainer's own <div> needs the real chart-sized rect; giving
+// every element (including axis tick <text> nodes) that same huge size
+// would make recharts' own tick-overlap avoidance think every tick
+// collides, collapsing the y-axis down to a single label regardless of
+// domain — so tick-sized elements get a small, realistic rect instead.
+Element.prototype.getBoundingClientRect = vi.fn(function (this: Element) {
+  const isMeasuredContainer = this.tagName === 'DIV';
+  const width = isMeasuredContainer ? 600 : 40;
+  const height = isMeasuredContainer ? 250 : 11;
+  return {
+    width,
+    height,
+    top: 0,
+    left: 0,
+    bottom: height,
+    right: width,
+    x: 0,
+    y: 0,
+    toJSON() {},
+  };
+});
 
 vi.mock('../../src/lib/api', () => ({
   api: {
@@ -120,5 +130,66 @@ describe('ConversionOverTimeChart', () => {
     render(<ConversionOverTimeChart experimentId="exp-1" />, { wrapper: createWrapper() });
 
     expect(await screen.findByText('Unable to load conversion data.')).toBeInTheDocument();
+  });
+
+  it('anchors the y-axis domain at 0, even when every observed rate is well above it', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        metric_key: 'signup-rate',
+        metric_name: 'Signup Rate',
+        series: [
+          {
+            date: '2026-08-20',
+            variants: [{ variant_key: 'control', sample_size: 100, conversions: 80, conversion_rate: 0.8 }],
+          },
+          {
+            date: '2026-08-21',
+            variants: [{ variant_key: 'control', sample_size: 100, conversions: 90, conversion_rate: 0.9 }],
+          },
+        ],
+      },
+    });
+
+    const { container } = render(<ConversionOverTimeChart experimentId="exp-1" />, {
+      wrapper: createWrapper(),
+    });
+    await screen.findByRole('img');
+
+    // With domain [0, 'auto'] recharts always includes a tick at the floor;
+    // the old dropped-domain behavior (default [dataMin, dataMax]) would
+    // start around 80%, never showing 0.0%.
+    const tickLabels = Array.from(
+      container.querySelectorAll('.recharts-yAxis .recharts-cartesian-axis-tick-value'),
+    ).map((el) => el.textContent);
+    expect(tickLabels).toContain('0.0%');
+  });
+
+  it('renders a gap without crashing when one variant has no rollup row for a date', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        metric_key: 'signup-rate',
+        metric_name: 'Signup Rate',
+        series: [
+          {
+            date: '2026-08-20',
+            variants: [
+              { variant_key: 'control', sample_size: 100, conversions: 10, conversion_rate: 0.1 },
+              { variant_key: 'treatment', sample_size: 100, conversions: 20, conversion_rate: 0.2 },
+            ],
+          },
+          {
+            date: '2026-08-21',
+            // treatment has no rollup row for this date at all.
+            variants: [{ variant_key: 'control', sample_size: 120, conversions: 15, conversion_rate: 0.125 }],
+          },
+        ],
+      },
+    });
+
+    render(<ConversionOverTimeChart experimentId="exp-1" />, { wrapper: createWrapper() });
+
+    await screen.findByRole('img');
+    expect(screen.getByText('control')).toBeInTheDocument();
+    expect(screen.getByText('treatment')).toBeInTheDocument();
   });
 });

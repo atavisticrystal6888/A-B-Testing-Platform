@@ -116,13 +116,13 @@ export default function ExperimentListPage() {
                 <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Variants
                 </th>
                 <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Created
                 </th>
-                <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Time to significance
                 </th>
               </tr>
@@ -147,13 +147,13 @@ export default function ExperimentListPage() {
                   <td className="px-6 py-4">
                     <StatusBadge status={exp.status} />
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600 tabular-nums">
+                  <td className="px-6 py-4 text-sm text-gray-600 tabular-nums text-right">
                     {exp.variant_count} variants
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500 tabular-nums">
                     {new Date(exp.inserted_at).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600 tabular-nums">
+                  <td className="px-6 py-4 text-sm text-gray-600 tabular-nums text-right">
                     {exp.status === "running" ? formatProjection(exp.days_to_significance) : "—"}
                   </td>
                 </tr>

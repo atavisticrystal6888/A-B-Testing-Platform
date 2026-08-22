@@ -142,6 +142,32 @@ describe('LaunchChecklistModal', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it('counts only "fail" items in the override label, not "unknown" ones', async () => {
+    // healthyExperiment() is status "draft", so the exposures check is
+    // always "unknown" (advisory, never blocking) regardless of timeline
+    // data. With no primary metric attached, only primary_metric actually
+    // fails — the override label must say "1", not "2".
+    const experiment = healthyExperiment();
+    experiment.metrics = [];
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        lifecycle: [],
+        daily_exposures: [{ date: new Date().toISOString().slice(0, 10), count: 5 }],
+      },
+    });
+
+    render(
+      <LaunchChecklistModal experiment={experiment} onConfirm={vi.fn()} onCancel={vi.fn()} />,
+      { wrapper: createWrapper() },
+    );
+
+    expect(await screen.findByText("Couldn't verify")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start anyway' }));
+
+    expect(await screen.findByRole('button', { name: 'Start with 1 unmet check?' })).toBeInTheDocument();
+  });
+
   it('renders the exposures check as "unknown" and does not block Start on its own when timeline data is unavailable', async () => {
     vi.mocked(api.get).mockRejectedValue(new Error('network error'));
 

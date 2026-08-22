@@ -50,6 +50,12 @@ export function InfoTip({ term }: InfoTipProps) {
   const [align, setAlign] = useState<Align>("center");
   const tooltipId = useId();
   const popoverRef = useRef<HTMLSpanElement>(null);
+  // Set on mousedown inside the popover and consumed by the very next blur.
+  // The popover's text isn't focusable, so clicking it still fires a native
+  // blur on the button; this flag lets that blur be told apart from a
+  // genuine "focus left the component" blur, without permanently
+  // swallowing later, unrelated blurs (it's reset as soon as it's read).
+  const popoverMouseDownRef = useRef(false);
 
   const openTip = () => {
     setOpen(true);
@@ -62,6 +68,20 @@ export function InfoTip({ term }: InfoTipProps) {
   const closeTip = () => {
     setOpen(false);
     setPinned(false);
+  };
+
+  const handleBlur = () => {
+    if (popoverMouseDownRef.current) {
+      // The blur was caused by clicking inside our own popover, not by
+      // focus moving elsewhere — ignore it (once) so a pinned tip stays open.
+      popoverMouseDownRef.current = false;
+      return;
+    }
+    closeTip();
+  };
+
+  const handlePopoverMouseDown = () => {
+    popoverMouseDownRef.current = true;
   };
 
   const handleClick = () => {
@@ -121,7 +141,7 @@ export function InfoTip({ term }: InfoTipProps) {
         onMouseEnter={openTip}
         onMouseLeave={handleMouseLeave}
         onFocus={openTip}
-        onBlur={closeTip}
+        onBlur={handleBlur}
         onClick={handleClick}
         className={`ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-[11px] font-semibold leading-none ${
           seen ? "text-gray-400 hover:text-gray-600" : "animate-pulse text-indigo-500"
@@ -136,6 +156,7 @@ export function InfoTip({ term }: InfoTipProps) {
           role="tooltip"
           onMouseEnter={openTip}
           onMouseLeave={handleMouseLeave}
+          onMouseDown={handlePopoverMouseDown}
           className={`absolute top-full z-10 mt-1 w-56 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white p-2 text-xs font-normal normal-case text-gray-600 shadow-lg ${POPOVER_ALIGN_CLASSES[align]}`}
         >
           {entry.definition}

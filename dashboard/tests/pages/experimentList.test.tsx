@@ -91,3 +91,46 @@ describe("ExperimentListPage — Time to significance column", () => {
     expect(screen.getAllByText("—")).toHaveLength(2);
   });
 });
+
+describe("ExperimentListPage — numeric column alignment", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("right-aligns the Variants and Time to significance columns, but not Created", async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: [
+        {
+          id: "exp-1",
+          key: "exp-1",
+          name: "Checkout Button Color",
+          status: "running",
+          variant_count: 2,
+          inserted_at: "2026-08-01T00:00:00Z",
+          days_to_significance: { status: "estimate", days_remaining: 16 },
+        },
+      ],
+      meta: { page: 1, page_size: 20, total: 1, total_pages: 1 },
+    });
+
+    render(<ExperimentListPage />, { wrapper: createWrapper() });
+
+    await screen.findByText("Checkout Button Color");
+
+    const variantsHeader = screen.getByRole("columnheader", { name: "Variants" });
+    const createdHeader = screen.getByRole("columnheader", { name: "Created" });
+    const etaHeader = screen.getByRole("columnheader", { name: "Time to significance" });
+
+    expect(variantsHeader).toHaveClass("text-right");
+    expect(etaHeader).toHaveClass("text-right");
+    expect(createdHeader).not.toHaveClass("text-right");
+
+    const variantsCell = screen.getByText("2 variants");
+    const etaCell = screen.getByText("~16d");
+    const createdCell = screen.getByText(new Date("2026-08-01T00:00:00Z").toLocaleDateString());
+
+    expect(variantsCell).toHaveClass("text-right");
+    expect(etaCell).toHaveClass("text-right");
+    expect(createdCell).not.toHaveClass("text-right");
+  });
+});

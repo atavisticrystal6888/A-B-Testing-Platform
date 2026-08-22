@@ -12,7 +12,7 @@ import { ExportMenu } from "../components/experiments/ExportMenu";
 import { SegmentBreakdownCard } from "../components/experiments/SegmentBreakdownCard";
 import { DecisionPanel } from "../components/experiments/DecisionPanel";
 import { SrmWarningBanner } from "../components/experiments/SrmWarningBanner";
-import { LoadingState, ErrorState } from "../components/ui/QueryStates";
+import { LoadingState, ErrorState, EmptyState } from "../components/ui/QueryStates";
 import { InfoTip } from "../components/ui/InfoTip";
 import { GLOSSARY } from "../lib/statsGlossary";
 import type { AnalysisResults, ConclusionDecision, Experiment, MetricResult, ProjectionResult } from "../lib/types";
@@ -315,7 +315,15 @@ export default function ExperimentDetailPage() {
   if (!experiment) {
     return (
       <div className="p-8">
-        <ErrorState message="Experiment not found." />
+        <EmptyState
+          title="Experiment not found"
+          hint="It may have been deleted, or the link may be out of date."
+          cta={
+            <Link to="/experiments" className="text-indigo-600 hover:text-indigo-700 font-medium">
+              Back to experiments
+            </Link>
+          }
+        />
       </div>
     );
   }

@@ -76,8 +76,12 @@ export default function ConversionOverTimeChart({ experimentId }: Props) {
 
   const chartData = series.map((entry) => {
     const row: Record<string, string | number | null> = { date: entry.date };
-    for (const variant of entry.variants) {
-      row[variant.variant_key] = variant.conversion_rate;
+    for (const key of variantKeys) {
+      // A variant with no rollup row for this date must be an explicit
+      // `null` (not a missing key, which would stringify to `undefined`) so
+      // `connectNulls` on <Line> treats the gap consistently.
+      const found = entry.variants.find((v) => v.variant_key === key);
+      row[key] = found ? found.conversion_rate : null;
     }
     return row;
   });
@@ -96,6 +100,7 @@ export default function ConversionOverTimeChart({ experimentId }: Props) {
           <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
           <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="#9ca3af" />
           <YAxis
+            domain={[0, 'auto']}
             tickFormatter={(v: number) => `${(v * 100).toFixed(1)}%`}
             tick={{ fontSize: 11 }}
             stroke="#9ca3af"
