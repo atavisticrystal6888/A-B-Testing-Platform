@@ -1,3 +1,5 @@
+import { EmptyState } from '../ui/QueryStates';
+
 interface Flag {
   id: string;
   key: string;
@@ -14,12 +16,9 @@ interface FeatureFlagListProps {
 
 export function FeatureFlagList({ flags, onSelect }: FeatureFlagListProps) {
   if (flags.length === 0) {
-    return (
-      <div className="text-center py-12 text-gray-500">
-        <p className="text-lg font-medium">No feature flags</p>
-        <p className="text-sm mt-1">Create a flag to get started.</p>
-      </div>
-    );
+    // No CTA here: flag creation isn't wired in the dashboard yet (see commit
+    // 7cf5d54), so a CTA would dead-end.
+    return <EmptyState title="No feature flags" hint="Create a flag to get started." />;
   }
 
   return (
