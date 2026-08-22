@@ -27,9 +27,16 @@ interface SegmentResponse {
 
 const SUGGESTED_ATTRIBUTES = ["country", "device"];
 
+const COHORT_CHIPS: { label: string; attribute: string }[] = [
+  { label: "Device", attribute: "device" },
+  { label: "Country", attribute: "country" },
+  { label: "New vs returning", attribute: "new_vs_returning" },
+];
+
 export function SegmentBreakdownCard({ experimentId }: { experimentId: string }) {
   const [attributeInput, setAttributeInput] = useState("country");
   const [attribute, setAttribute] = useState<string | null>(null);
+  const [showCustomInput, setShowCustomInput] = useState(false);
 
   const { data, isFetching, isError } = useQuery<SegmentResponse>({
     queryKey: ["segments", experimentId, attribute],
@@ -43,43 +50,82 @@ export function SegmentBreakdownCard({ experimentId }: { experimentId: string })
   const segments = data?.data.segments ?? [];
   const variantKeys = segments[0]?.variants.map((v) => v.variant_key) ?? [];
 
+  const chipClass = (isActive: boolean) =>
+    `rounded-full border px-3 py-1 text-sm ${
+      isActive
+        ? "bg-indigo-600 text-white border-indigo-600"
+        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+    }`;
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
       <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">Segment Breakdown</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-900">Segment Breakdown</h3>
+            <span className="text-xs text-gray-500 border rounded-full px-2 py-0.5">
+              descriptive only — no significance claims
+            </span>
+          </div>
           <p className="text-xs text-gray-500 mt-0.5">
             Descriptive split by assignment attribute — not significance-tested.
           </p>
         </div>
-        <form
-          className="flex items-center gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (attributeInput.trim()) setAttribute(attributeInput.trim());
-          }}
-        >
-          <input
-            type="text"
-            value={attributeInput}
-            onChange={(event) => setAttributeInput(event.target.value)}
-            list="segment-attributes"
-            placeholder="attribute (e.g. country)"
-            className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs w-40"
-          />
-          <datalist id="segment-attributes">
-            {SUGGESTED_ATTRIBUTES.map((suggestion) => (
-              <option key={suggestion} value={suggestion} />
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {COHORT_CHIPS.map((chip) => (
+              <button
+                key={chip.attribute}
+                type="button"
+                onClick={() => {
+                  setShowCustomInput(false);
+                  setAttributeInput(chip.attribute);
+                  setAttribute(chip.attribute);
+                }}
+                className={chipClass(!showCustomInput && attribute === chip.attribute)}
+              >
+                {chip.label}
+              </button>
             ))}
-          </datalist>
-          <button
-            type="submit"
-            disabled={!attributeInput.trim() || isFetching}
-            className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {isFetching ? "Loading..." : "Break down"}
-          </button>
-        </form>
+            <button
+              type="button"
+              onClick={() => setShowCustomInput(true)}
+              className={chipClass(showCustomInput)}
+            >
+              Custom…
+            </button>
+          </div>
+          {showCustomInput && (
+            <form
+              className="flex items-center gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (attributeInput.trim()) setAttribute(attributeInput.trim());
+              }}
+            >
+              <input
+                type="text"
+                value={attributeInput}
+                onChange={(event) => setAttributeInput(event.target.value)}
+                list="segment-attributes"
+                placeholder="attribute (e.g. country)"
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs w-40"
+              />
+              <datalist id="segment-attributes">
+                {SUGGESTED_ATTRIBUTES.map((suggestion) => (
+                  <option key={suggestion} value={suggestion} />
+                ))}
+              </datalist>
+              <button
+                type="submit"
+                disabled={!attributeInput.trim() || isFetching}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {isFetching ? "Loading..." : "Break down"}
+              </button>
+            </form>
+          )}
+        </div>
       </div>
 
       {!attribute ? (
