@@ -75,13 +75,17 @@ defmodule ExperimentHubWeb.DailyResultsControllerTest do
           "role" => "primary"
         })
 
-      today = Date.utc_today()
-      yesterday = Date.add(today, -1)
+      # Both dates land inside the same current-month partition (the
+      # experiment_results_daily migration only guarantees that one at test
+      # time) — same clamp DemoSeeds.demo_dates/0 uses, so this never
+      # flakes on the 1st of a month the way `Date.add(today, -1)` would.
+      day1 = %{Date.utc_today() | day: 1}
+      day2 = Date.add(day1, 1)
 
-      insert_rollup!(tenant, experiment, control, metric_definition, yesterday, 100, 10)
-      insert_rollup!(tenant, experiment, treatment, metric_definition, yesterday, 100, 20)
-      insert_rollup!(tenant, experiment, control, metric_definition, today, 0, 0)
-      insert_rollup!(tenant, experiment, treatment, metric_definition, today, 200, 40)
+      insert_rollup!(tenant, experiment, control, metric_definition, day1, 100, 10)
+      insert_rollup!(tenant, experiment, treatment, metric_definition, day1, 100, 20)
+      insert_rollup!(tenant, experiment, control, metric_definition, day2, 0, 0)
+      insert_rollup!(tenant, experiment, treatment, metric_definition, day2, 200, 40)
 
       conn = get(conn, "/api/v1/experiments/#{experiment.id}/daily-results")
       response = json_response(conn, 200)
@@ -94,32 +98,32 @@ defmodule ExperimentHubWeb.DailyResultsControllerTest do
       assert length(series) == 2
 
       assert Enum.map(series, & &1["date"]) == [
-               Date.to_iso8601(yesterday),
-               Date.to_iso8601(today)
+               Date.to_iso8601(day1),
+               Date.to_iso8601(day2)
              ]
 
-      yesterday_entry = Enum.find(series, &(&1["date"] == Date.to_iso8601(yesterday)))
+      day1_entry = Enum.find(series, &(&1["date"] == Date.to_iso8601(day1)))
 
-      control_yesterday =
-        Enum.find(yesterday_entry["variants"], &(&1["variant_key"] == "control"))
+      control_day1 =
+        Enum.find(day1_entry["variants"], &(&1["variant_key"] == "control"))
 
-      treatment_yesterday =
-        Enum.find(yesterday_entry["variants"], &(&1["variant_key"] == "treatment"))
+      treatment_day1 =
+        Enum.find(day1_entry["variants"], &(&1["variant_key"] == "treatment"))
 
-      assert control_yesterday["sample_size"] == 100
-      assert control_yesterday["conversions"] == 10
-      assert control_yesterday["conversion_rate"] == 0.1
+      assert control_day1["sample_size"] == 100
+      assert control_day1["conversions"] == 10
+      assert control_day1["conversion_rate"] == 0.1
 
-      assert treatment_yesterday["sample_size"] == 100
-      assert treatment_yesterday["conversions"] == 20
-      assert treatment_yesterday["conversion_rate"] == 0.2
+      assert treatment_day1["sample_size"] == 100
+      assert treatment_day1["conversions"] == 20
+      assert treatment_day1["conversion_rate"] == 0.2
 
-      today_entry = Enum.find(series, &(&1["date"] == Date.to_iso8601(today)))
-      control_today = Enum.find(today_entry["variants"], &(&1["variant_key"] == "control"))
+      day2_entry = Enum.find(series, &(&1["date"] == Date.to_iso8601(day2)))
+      control_day2 = Enum.find(day2_entry["variants"], &(&1["variant_key"] == "control"))
 
       # sample_size = 0 must yield a nil conversion_rate rather than dividing by zero.
-      assert control_today["sample_size"] == 0
-      assert control_today["conversion_rate"] == nil
+      assert control_day2["sample_size"] == 0
+      assert control_day2["conversion_rate"] == nil
     end
 
     test "returns empty series when the experiment has no primary metric", %{
