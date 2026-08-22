@@ -54,3 +54,18 @@ class TestProjectDaysToSignificance:
             exposure_rate_per_day=500,
         )
         assert result == {"status": "insufficient_data", "days_remaining": None}
+
+    def test_three_arm_pair_rate_known_answer(self):
+        # Known-answer case for a 3-arm experiment. The comparison is still
+        # pairwise (num_variants=2, required 10_000/variant -> 20_000 total),
+        # but the exposure rate passed in here is already the *pair* rate
+        # after the caller scales the experiment-wide rate down for a 3-arm
+        # split (600/day experiment-wide * 2/3 = 400/day for this pair).
+        # current 12_000 -> remaining 8_000 -> ceil(8000/400) = 20 days.
+        result = project_days_to_significance(
+            minimum_required_per_variant=10_000,
+            current_total=12_000,
+            num_variants=2,
+            exposure_rate_per_day=400,
+        )
+        assert result == {"status": "estimate", "days_remaining": 20}

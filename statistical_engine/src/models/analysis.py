@@ -66,6 +66,13 @@ class AnalysisConfig(BaseModel):
     # back-compat: omitting it (or leaving it non-positive) simply skips the
     # days-to-significance projection rather than affecting anything else.
     exposure_rate_per_day: Optional[float] = None
+    # Total number of arms (variants) in the experiment, supplied by the
+    # caller (Elixir). exposure_rate_per_day is measured across the whole
+    # experiment, but the projection only ever compares one pair, so this is
+    # used to scale the rate down to that pair's share of traffic. Optional
+    # and back-compat: omitting it (or a value < 2) leaves
+    # exposure_rate_per_day unscaled, matching today's behavior exactly.
+    variant_count: Optional[int] = None
 
 
 class AnalysisRequest(BaseModel):

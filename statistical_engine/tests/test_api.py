@@ -125,6 +125,72 @@ class TestAnalyzeEndpoint:
         assert projection["status"] == "estimate"
         assert projection["days_remaining"] == expected_days
 
+    def test_analyze_variant_count_three_is_more_conservative_than_two(self):
+        # Multi-arm bias fix: exposure_rate_per_day is experiment-wide (all
+        # arms), but the projection compares one pair. For a 3-arm
+        # experiment, the pair should only get credit for its even share of
+        # traffic (2/3 of the experiment-wide rate), not the full rate — so
+        # days_remaining must come out larger (more conservative) than the
+        # same request with variant_count=2 (where the pair rate is
+        # unchanged from the raw rate).
+        stats = [
+            {"variant_key": "control", "sample_size": 1000, "conversions": 100},
+            {"variant_key": "treatment", "sample_size": 1000, "conversions": 150},
+        ]
+
+        def _days_for(variant_count):
+            config = {
+                "significance_level": 0.05,
+                "power": 0.80,
+                "analysis_types": ["frequentist"],
+                "exposure_rate_per_day": 200,
+                "variant_count": variant_count,
+            }
+            response = client.post(
+                "/stats/v1/analyze/550e8400-e29b-41d4-a716-446655440000",
+                json=_payload([_primary_metric(stats)], config=config),
+                headers=INTERNAL_KEY_HEADER,
+            )
+            assert response.status_code == 200
+            return response.json()["metrics"][0]["projection"]["days_remaining"]
+
+        days_two_arms = _days_for(2)
+        days_three_arms = _days_for(3)
+        assert days_three_arms > days_two_arms
+
+    def test_analyze_without_variant_count_is_unchanged(self):
+        # Back-compat: omitting variant_count entirely must produce the same
+        # projection as today (rate used unscaled) — identical to explicitly
+        # passing variant_count=2, since 2/variant_count == 1 there too.
+        stats = [
+            {"variant_key": "control", "sample_size": 1000, "conversions": 100},
+            {"variant_key": "treatment", "sample_size": 1000, "conversions": 150},
+        ]
+        config_no_variant_count = {
+            "significance_level": 0.05,
+            "power": 0.80,
+            "analysis_types": ["frequentist"],
+            "exposure_rate_per_day": 200,
+        }
+        config_variant_count_two = {**config_no_variant_count, "variant_count": 2}
+
+        response_no_field = client.post(
+            "/stats/v1/analyze/550e8400-e29b-41d4-a716-446655440000",
+            json=_payload([_primary_metric(stats)], config=config_no_variant_count),
+            headers=INTERNAL_KEY_HEADER,
+        )
+        response_field_two = client.post(
+            "/stats/v1/analyze/550e8400-e29b-41d4-a716-446655440000",
+            json=_payload([_primary_metric(stats)], config=config_variant_count_two),
+            headers=INTERNAL_KEY_HEADER,
+        )
+        assert response_no_field.status_code == 200
+        assert response_field_two.status_code == 200
+        assert (
+            response_no_field.json()["metrics"][0]["projection"]
+            == response_field_two.json()["metrics"][0]["projection"]
+        )
+
     def test_analyze_secondary_metric_gets_no_projection(self):
         # Projection is primary-only, even with a positive exposure rate.
         stats = [

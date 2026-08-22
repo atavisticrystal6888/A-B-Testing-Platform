@@ -234,20 +234,28 @@ def _analyze_metric(metric: MetricInput, request: AnalysisRequest) -> MetricResu
     # and only when the caller supplied a positive exposure rate — omitting
     # exposure_rate_per_day must leave the response byte-identical to today.
     projection = None
-    if metric.role == MetricRole.PRIMARY and (request.config.exposure_rate_per_day or 0) > 0:
+    raw_exposure_rate = request.config.exposure_rate_per_day
+    if metric.role == MetricRole.PRIMARY and raw_exposure_rate is not None and raw_exposure_rate > 0:
         minimum_required = sample_size_result.minimum_required if sample_size_result else None
+        exposure_rate = raw_exposure_rate
+        variant_count = request.config.variant_count
+        # exposure_rate_per_day is measured by the Elixir side across the
+        # *whole* experiment, but this analysis only ever compares one
+        # control/treatment pair (num_variants=2 below). For a 3+-arm
+        # experiment, using the experiment-wide rate directly overstates how
+        # much traffic lands in this pair, biasing days_remaining
+        # optimistically. Scale it down to the pair's even share of traffic
+        # (assumes an even split across arms — the only assumption available
+        # without per-arm rates). Omitting variant_count, or a value < 2,
+        # leaves the rate unscaled, matching today's behavior exactly.
+        if variant_count is not None and variant_count >= 2:
+            exposure_rate = exposure_rate * 2 / variant_count
         proj = project_days_to_significance(
             minimum_required_per_variant=minimum_required,
             current_total=control_n + treatment_n,
-            # Mirrors the pairwise control/treatment assumption used at
-            # lines ~250/291 (this analysis only ever compares one control
-            # to one treatment). The Elixir side's exposure rate, though,
-            # counts assignments across *all* variants of the experiment —
-            # so for a 3+-arm experiment this projection under-counts how
-            # many exposures actually land in this pair per day, making the
-            # days-to-significance estimate optimistic.
+            # This analysis only ever compares one control to one treatment.
             num_variants=2,
-            exposure_rate_per_day=request.config.exposure_rate_per_day,
+            exposure_rate_per_day=exposure_rate,
         )
         projection = ProjectionResult(**proj)
 
