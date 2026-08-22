@@ -22,6 +22,30 @@ defmodule ExperimentHub.Repo do
     end
   end
 
+  @doc """
+  Clears the tenant context: the per-process value used by
+  `prepare_query/3`, and the Postgres session GUC RLS policies read.
+
+  Callers (`ExperimentHubWeb.Plugs.TenantContext`'s `before_send` hook,
+  Oban workers after `put_tenant_id/1`) call this once their unit of work
+  finishes, so a pooled connection doesn't carry one tenant's id into the
+  next, unrelated caller that reuses it.
+
+  Residual risk (documented, not fixed here — see the fixes report for
+  why a full fix needs an architectural change this task intentionally
+  does not make): `set_config(..., false)` is session-scoped because nothing
+  wraps the request/job in an explicit transaction, so `SET LOCAL` isn't an
+  option. Outside a transaction, Ecto/DBConnection checks a connection out
+  of the pool per query, not once per request — so `put_tenant_id/1` and a
+  later query in the *same* request are not guaranteed to run on the *same*
+  physical connection, and this function's own `RESET` query is subject to
+  the same pool checkout as anything else. This closes the common case (a
+  connection that goes idle at the end of a request/job keeps a tenant id
+  forever); it does not guarantee every query in every request lands on a
+  connection that has *this* request's tenant id and no other's for RLS
+  purposes. `prepare_query/3`'s process-dictionary scoping is unaffected by
+  any of this — it dies with the request process, not the connection.
+  """
   def clear_tenant_id do
     Process.delete(@tenant_key)
 
