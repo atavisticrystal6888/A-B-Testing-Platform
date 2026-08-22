@@ -38,6 +38,8 @@ defmodule ExperimentHubWeb.ExperimentController do
 
     case Experiments.create_experiment(attrs) do
       {:ok, experiment, warnings} ->
+        AuditLog.log_experiment_change(experiment, "created", actor_opts(conn))
+
         conn
         |> put_status(201)
         |> render(:show_with_warnings, experiment: experiment, warnings: warnings)

@@ -56,6 +56,25 @@ defmodule ExperimentHubWeb.ExperimentControllerTest do
       assert is_list(response["warnings"])
     end
 
+    test "writes a created audit entry whose timeline lifecycle starts with created", %{
+      conn: conn
+    } do
+      params = %{
+        "key" => "audit-created-check",
+        "name" => "Audit Created Check"
+      }
+
+      response = json_response(post(conn, "/api/v1/experiments", params), 201)
+      experiment_id = response["id"]
+
+      timeline_response =
+        json_response(get(conn, "/api/v1/experiments/#{experiment_id}/timeline"), 200)
+
+      lifecycle = timeline_response["data"]["lifecycle"]
+
+      assert [%{"action" => "created"} | _] = lifecycle
+    end
+
     test "creates experiment without variants", %{conn: conn} do
       params = %{
         "key" => "minimal-test",
