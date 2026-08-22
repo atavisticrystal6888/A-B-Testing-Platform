@@ -5,7 +5,13 @@ defmodule ExperimentHub.Metrics do
 
   import Ecto.Query
   alias ExperimentHub.Repo
-  alias ExperimentHub.Metrics.{MetricDefinition, ExperimentMetric, StatisticalAnalysis}
+
+  alias ExperimentHub.Metrics.{
+    MetricDefinition,
+    ExperimentMetric,
+    ExperimentResultDaily,
+    StatisticalAnalysis
+  }
 
   # --- Metric Definitions ---
 
@@ -163,4 +169,77 @@ defmodule ExperimentHub.Metrics do
       end)
     end
   end
+
+  @doc """
+  Daily conversion rollups for an experiment's PRIMARY metric, sourced from
+  `ExperimentResultDaily` (the `experiment_results_daily` partitioned table).
+
+  Expects `experiment` to have `:experiment_metrics` preloaded (with
+  `:metric_definition`), as returned by `Experiments.get_experiment/1` — the
+  same struct the timeline/results controllers already load, so callers don't
+  pay for an extra query just to resolve the primary metric.
+
+  Returns `%{metric_key: nil, metric_name: nil, series: []}` when the
+  experiment has no primary metric attached, and `series: []` (with the
+  metric identified) when a primary metric exists but no rollups have been
+  computed for it yet. Otherwise returns one series entry per date
+  (ascending), each carrying every variant's sample_size, conversions, and
+  conversion_rate (`conversions / sample_size`, `nil` when sample_size is 0
+  rather than dividing by zero).
+  """
+  def daily_primary_results(experiment) do
+    case Enum.find(experiment.experiment_metrics, &(&1.role == "primary")) do
+      nil ->
+        %{metric_key: nil, metric_name: nil, series: []}
+
+      %ExperimentMetric{metric_definition: metric_definition} = experiment_metric ->
+        series =
+          experiment_metric.metric_definition_id
+          |> daily_rollup_rows(experiment)
+          |> Enum.group_by(& &1.date)
+          |> Enum.sort_by(fn {date, _rows} -> date end, {:asc, Date})
+          |> Enum.map(fn {date, rows} ->
+            %{
+              date: Date.to_iso8601(date),
+              variants:
+                Enum.map(rows, fn row ->
+                  %{
+                    variant_key: row.variant_key,
+                    sample_size: row.sample_size,
+                    conversions: row.conversions,
+                    conversion_rate: conversion_rate(row.sample_size, row.conversions)
+                  }
+                end)
+            }
+          end)
+
+        %{
+          metric_key: metric_definition.key,
+          metric_name: metric_definition.name,
+          series: series
+        }
+    end
+  end
+
+  defp daily_rollup_rows(metric_definition_id, experiment) do
+    from(r in ExperimentResultDaily,
+      join: v in ExperimentHub.Experiments.Variant,
+      on: v.id == r.variant_id,
+      where:
+        r.tenant_id == ^experiment.tenant_id and
+          r.experiment_id == ^experiment.id and
+          r.metric_definition_id == ^metric_definition_id,
+      order_by: [asc: r.date, asc: v.sort_order, asc: v.key],
+      select: %{
+        date: r.date,
+        variant_key: v.key,
+        sample_size: r.sample_size,
+        conversions: r.conversions
+      }
+    )
+    |> Repo.all()
+  end
+
+  defp conversion_rate(0, _conversions), do: nil
+  defp conversion_rate(sample_size, conversions), do: conversions / sample_size
 end

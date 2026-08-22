@@ -233,6 +233,26 @@ export interface ExperimentTimeline {
   daily_exposures: DailyExposure[];
 }
 
+export interface DailyResultVariant {
+  variant_key: string;
+  sample_size: number;
+  conversions: number;
+  conversion_rate: number | null;
+}
+
+export interface DailyResultEntry {
+  date: string;
+  variants: DailyResultVariant[];
+}
+
+/** GET /api/v1/experiments/:experiment_id/daily-results — real per-day,
+ * per-variant conversion rollups for the experiment's primary metric. */
+export interface DailyResults {
+  metric_key: string | null;
+  metric_name: string | null;
+  series: DailyResultEntry[];
+}
+
 export interface AssignmentResult {
   experiment_key: string;
   variant_key: string;

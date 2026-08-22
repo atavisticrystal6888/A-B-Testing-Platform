@@ -78,6 +78,9 @@ defmodule ExperimentHubWeb.Router do
     # Timeline (lifecycle audit events + daily exposure counts)
     get "/experiments/:experiment_id/timeline", TimelineController, :show
 
+    # Daily conversion rollups for the experiment's primary metric
+    get "/experiments/:experiment_id/daily-results", DailyResultsController, :show
+
     # Analytics
     get "/analytics/overview", AnalyticsController, :overview
 
