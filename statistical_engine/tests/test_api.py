@@ -158,6 +158,40 @@ class TestAnalyzeEndpoint:
         days_three_arms = _days_for(3)
         assert days_three_arms > days_two_arms
 
+    def test_analyze_variant_count_three_known_answer(self):
+        # QA-hardening follow-up: the inequality test above (days_three_arms
+        # > days_two_arms) doesn't pin the *magnitude* of the scale factor —
+        # a wrong-but-monotonic formula (e.g. rate*4/vc**2 or rate*(2/vc)**3)
+        # would also satisfy it. Pin the exact value for this payload so
+        # changing the scale factor breaks a test.
+        #
+        # baseline_rate=0.10, MDE=0.02 -> sample_size_proportions gives
+        # minimum_required=3839/variant (current_total=2000). Experiment-wide
+        # rate 200/day scaled to the pair for a 3-arm split:
+        # pair_rate = 200 * 2 / 3 = 133.33.. -> days = ceil((3839*2 - 2000)
+        # / pair_rate) = ceil(5678 / 133.33..) = 43.
+        stats = [
+            {"variant_key": "control", "sample_size": 1000, "conversions": 100},
+            {"variant_key": "treatment", "sample_size": 1000, "conversions": 150},
+        ]
+        config = {
+            "significance_level": 0.05,
+            "power": 0.80,
+            "analysis_types": ["frequentist"],
+            "exposure_rate_per_day": 200,
+            "variant_count": 3,
+        }
+
+        response = client.post(
+            "/stats/v1/analyze/550e8400-e29b-41d4-a716-446655440000",
+            json=_payload([_primary_metric(stats)], config=config),
+            headers=INTERNAL_KEY_HEADER,
+        )
+        assert response.status_code == 200
+        metric = response.json()["metrics"][0]
+        assert metric["sample_size_calculation"]["minimum_required"] == 3839
+        assert metric["projection"]["days_remaining"] == 43
+
     def test_analyze_without_variant_count_is_unchanged(self):
         # Back-compat: omitting variant_count entirely must produce the same
         # projection as today (rate used unscaled) — identical to explicitly
