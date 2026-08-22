@@ -61,15 +61,22 @@ describe("Layout — mobile drawer", () => {
   it("opens on hamburger click and closes when Escape is pressed", () => {
     renderLayout();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open navigation menu" }));
+    const hamburger = screen.getByRole("button", { name: "Open navigation menu" });
+    expect(hamburger).toHaveAttribute("aria-expanded", "false");
+    expect(hamburger).toHaveAttribute("aria-controls", "app-sidebar");
+
+    fireEvent.click(hamburger);
 
     const sidebar = screen.getByRole("complementary");
+    expect(sidebar).toHaveAttribute("id", "app-sidebar");
     expect(sidebar).toHaveClass("translate-x-0");
     expect(document.querySelector(".bg-black\\/50")).toBeInTheDocument();
+    expect(hamburger).toHaveAttribute("aria-expanded", "true");
 
     fireEvent.keyDown(document, { key: "Escape" });
 
     expect(sidebar).toHaveClass("-translate-x-full");
     expect(document.querySelector(".bg-black\\/50")).not.toBeInTheDocument();
+    expect(hamburger).toHaveAttribute("aria-expanded", "false");
   });
 });

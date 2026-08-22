@@ -189,6 +189,7 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside
+        id="app-sidebar"
         className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-gray-200 bg-white transition-transform duration-200 ease-in-out md:relative md:z-auto md:translate-x-0 md:transition-[width] ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } ${collapsed ? "md:w-16" : "md:w-64"}`}
@@ -275,6 +276,8 @@ export default function Layout() {
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation menu"
+            aria-expanded={mobileOpen}
+            aria-controls="app-sidebar"
             className="rounded-lg p-2 text-gray-600 hover:bg-gray-100"
           >
             <MenuIcon className="h-6 w-6" />
