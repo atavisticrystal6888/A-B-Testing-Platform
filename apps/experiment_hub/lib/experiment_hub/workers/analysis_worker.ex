@@ -108,7 +108,14 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
         sequential_analysis: true,
         spending_function: "obrien_fleming",
         analysis_types: ["frequentist"],
-        exposure_rate_per_day: exposure_rate_per_day(experiment)
+        exposure_rate_per_day: exposure_rate_per_day(experiment),
+        # Lets the engine scale exposure_rate_per_day down to the compared
+        # pair's share of traffic (2/variant_count) for 3+-arm experiments,
+        # instead of the optimistic days-to-significance estimate the full
+        # experiment-wide rate produces. A value of 2 (two-arm experiments)
+        # is a no-op by construction. `experiment.variants` is preloaded by
+        # run_analysis/3 before this is called.
+        variant_count: length(experiment.variants)
       }
     }
   end

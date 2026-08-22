@@ -120,5 +120,21 @@ defmodule ExperimentHub.Workers.AnalysisWorkerTest do
       assert %{config: %{exposure_rate_per_day: rate}} = request
       assert_in_delta rate, 2 / 7, 0.01
     end
+
+    test "sends variant_count so the engine can scale exposure_rate_per_day for multi-arm experiments" do
+      tenant = tenant_fixture()
+      Repo.put_tenant_id(tenant.id)
+
+      experiment = experiment_fixture(%{tenant: tenant, status: "running"})
+      variant_fixture(%{experiment: experiment, tenant: tenant, key: "control", is_control: true})
+      variant_fixture(%{experiment: experiment, tenant: tenant, key: "b", is_control: false})
+      variant_fixture(%{experiment: experiment, tenant: tenant, key: "c", is_control: false})
+
+      experiment = Repo.preload(experiment, :variants)
+      metrics = Metrics.list_experiment_metrics(experiment.id)
+      request = AnalysisWorker.build_analysis_request(experiment, tenant.id, metrics)
+
+      assert %{config: %{variant_count: 3}} = request
+    end
   end
 end
