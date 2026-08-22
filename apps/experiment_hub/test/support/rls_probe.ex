@@ -68,19 +68,7 @@ defmodule ExperimentHub.TestSupport.RLSProbe do
   `FOR` clause), not only its read-path filtering.
   """
   def ensure_probe_role!(admin, tables) do
-    Postgrex.query!(
-      admin,
-      """
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '#{@probe_role}') THEN
-          CREATE ROLE #{@probe_role} LOGIN PASSWORD '#{@probe_password}' NOSUPERUSER NOBYPASSRLS;
-        END IF;
-      END
-      $$;
-      """,
-      []
-    )
+    create_probe_role!(admin)
 
     Postgrex.query!(admin, "GRANT USAGE ON SCHEMA public TO #{@probe_role}", [])
 
@@ -94,6 +82,72 @@ defmodule ExperimentHub.TestSupport.RLSProbe do
 
     :ok
   end
+
+  # `CREATE ROLE` requires the connecting role to itself have CREATEROLE (or
+  # be superuser). On this workstation's native Postgres, the default
+  # `postgres` role is superuser, so this always succeeds silently -- but a
+  # database whose owning role lacks that privilege (e.g. the
+  # docker-compose container's `experimenthub` role, which is granted
+  # CREATEDB + BYPASSRLS but not CREATEROLE) fails here with a bare
+  # `Postgrex.Error` that gives no hint about *why* RLS-probe setup, of all
+  # things, is the one part of the suite that broke. Catch that specific
+  # failure and name the fix instead of leaving it to be rediscovered.
+  defp create_probe_role!(admin) do
+    Postgrex.query!(
+      admin,
+      """
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '#{@probe_role}') THEN
+          CREATE ROLE #{@probe_role} LOGIN PASSWORD '#{@probe_password}' NOSUPERUSER NOBYPASSRLS;
+        END IF;
+      END
+      $$;
+      """,
+      []
+    )
+  rescue
+    error in Postgrex.Error ->
+      if insufficient_privilege?(error) do
+        raise """
+        ExperimentHub.TestSupport.RLSProbe setup failed: could not CREATE ROLE \
+        "#{@probe_role}".
+
+        The database role the test suite connected as (currently \
+        #{inspect(Keyword.get(repo_config(), :username))}) lacks the CREATEROLE \
+        privilege (and is not superuser), so it cannot create the RLS probe \
+        role that ExperimentHub.RLSEnforcementTest needs.
+
+        This happens when tests run against a database whose owning role is \
+        shaped like the docker-compose container's ("experimenthub": \
+        CREATEDB + BYPASSRLS, but not CREATEROLE) rather than a native \
+        Postgres install's superuser "postgres" role.
+
+        Fix: point the suite at a role with CREATEROLE (or superuser) via \
+        the DB_USERNAME / DB_PASSWORD environment variables, e.g.:
+
+            DB_USERNAME=postgres DB_PASSWORD=postgres mix test
+
+        (this does not change config/test.exs's own defaults -- only \
+        overriding them via env vars affects which role is used.)
+
+        Original error: #{Exception.message(error)}
+        """
+      else
+        reraise error, __STACKTRACE__
+      end
+  end
+
+  defp insufficient_privilege?(%Postgrex.Error{postgres: %{code: :insufficient_privilege}}) do
+    true
+  end
+
+  defp insufficient_privilege?(%Postgrex.Error{message: message}) when is_binary(message) do
+    String.contains?(message, "permission denied") or
+      String.contains?(message, "must be superuser")
+  end
+
+  defp insufficient_privilege?(_), do: false
 
   @doc """
   Runs `query_fun.(conn)` on a *fresh* probe-role connection with
