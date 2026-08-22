@@ -1,11 +1,15 @@
 import { useState } from "react";
-import { downloadFile } from "../../lib/api";
-import { downloadReadout } from "../../lib/readout";
+import { api, downloadFile, describeApiError } from "../../lib/api";
+import { downloadReadout, buildReadoutHtml } from "../../lib/readout";
 import type { AnalysisResults, Experiment } from "../../lib/types";
 
 interface ExportMenuProps {
   experiment: Experiment;
   results?: AnalysisResults;
+}
+
+interface ShareReadoutResponse {
+  data: { url: string };
 }
 
 /**
@@ -15,6 +19,7 @@ interface ExportMenuProps {
  */
 export function ExportMenu({ experiment, results }: ExportMenuProps) {
   const [error, setError] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const exportResults = (format: "csv" | "json") => {
     setError(null);
@@ -22,6 +27,24 @@ export function ExportMenu({ experiment, results }: ExportMenuProps) {
       `/api/v1/experiments/${experiment.id}/export/results?format=${format}`,
       `${experiment.key}-results.${format}`,
     ).catch(() => setError("Export failed. Is the experiment collecting data?"));
+  };
+
+  const copyShareLink = async () => {
+    if (!results) return;
+
+    setError(null);
+    try {
+      const html = buildReadoutHtml(experiment, results);
+      const response = await api.post<ShareReadoutResponse>(
+        `/api/v1/experiments/${experiment.id}/share-readout`,
+        { html },
+      );
+      await navigator.clipboard.writeText(response.data.url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch (err) {
+      setError(describeApiError(err, "Failed to create share link."));
+    }
   };
 
   return (
@@ -32,6 +55,18 @@ export function ExportMenu({ experiment, results }: ExportMenuProps) {
         title="Self-contained HTML summary you can share or print to PDF"
       >
         Download Readout
+      </button>
+      <button
+        onClick={copyShareLink}
+        disabled={!results}
+        title={
+          results
+            ? "Create a public, read-only link to this readout (expires in 30 days)"
+            : "Analysis results are required before a readout can be shared"
+        }
+        className="px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-50"
+      >
+        {linkCopied ? "Link copied ✓" : "Copy share link"}
       </button>
       <button
         onClick={() => exportResults("csv")}

@@ -27,6 +27,10 @@ defmodule ExperimentHubWeb.Router do
     pipe_through :api
 
     get "/health", HealthController, :index
+
+    # Shareable readout link (Roadmap #7): unauthenticated by design — the
+    # signed, unguessable Phoenix.Token is itself the access control.
+    get "/share/readout/:token", ShareController, :show
   end
 
   # Prometheus scrape endpoint (no auth, no pipeline: scrapers send
@@ -83,6 +87,9 @@ defmodule ExperimentHubWeb.Router do
     # Export
     get "/experiments/:experiment_id/export", ExportController, :export_experiment
     get "/experiments/:experiment_id/export/results", ExportController, :export_results
+
+    # Shareable readout link (Roadmap #7)
+    post "/experiments/:experiment_id/share-readout", ShareController, :create
 
     # Tenant
     get "/tenant", TenantController, :show

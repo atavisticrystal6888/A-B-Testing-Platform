@@ -14,7 +14,8 @@ defmodule ExperimentHub.Experiments do
     Variant,
     StateMachine,
     LaunchValidator,
-    OverlapDetector
+    OverlapDetector,
+    SharedReadout
   }
 
   # --- Experiments ---
@@ -266,6 +267,30 @@ defmodule ExperimentHub.Experiments do
       )
       |> Repo.update()
     end
+  end
+
+  # --- Shared Readouts ---
+
+  @doc """
+  Creates a shared, read-only readout snapshot. `attrs` must include
+  "tenant_id", "experiment_id", and "html" (the client-generated HTML from
+  `buildReadoutHtml`, capped at 2MB by `SharedReadout.changeset/2`). Returns
+  `{:ok, shared_readout}` or `{:error, changeset}`.
+  """
+  def create_shared_readout(attrs) do
+    %SharedReadout{}
+    |> SharedReadout.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Gets a shared readout by id, bypassing tenant scoping. This table has no
+  tenant_isolation RLS policy and the public share route (ShareController.show)
+  runs with no tenant context set — see the moduledoc on migration
+  20260401000025 for why. Returns `nil` if not found.
+  """
+  def get_shared_readout(id) do
+    Repo.get(SharedReadout, id, skip_tenant_scope: true)
   end
 
   defp get_integer_opt(opts, key, default) do
