@@ -59,6 +59,33 @@ defmodule ExperimentHub.Repo do
     Process.get(@tenant_key)
   end
 
+  @doc """
+  Runs `fun` (arity 0) with the tenant context set to `tenant_id`, and
+  guarantees `clear_tenant_id/0` runs afterward via `try/after` — including
+  when `fun` raises or exits.
+
+  Every `put_tenant_id/1` caller (Oban workers, demo seeding) should go
+  through this instead of pairing `put_tenant_id/1` with its own
+  `clear_tenant_id/0` call at the end of the happy path: a bare pairing
+  without `try/after` leaves the session GUC (and the process-dictionary
+  value `prepare_query/3` reads) set to this tenant forever the moment
+  anything in between raises — silently reintroducing the exact leak
+  `clear_tenant_id/0`'s moduledoc describes, just on the exception path
+  instead of the normal-return path.
+
+  Returns (or reraises) whatever `fun.()` returns or raises — the `after`
+  block only runs the cleanup side effect and never changes the outcome.
+  """
+  def with_tenant(tenant_id, fun) when is_binary(tenant_id) and is_function(fun, 0) do
+    put_tenant_id(tenant_id)
+
+    try do
+      fun.()
+    after
+      clear_tenant_id()
+    end
+  end
+
   @impl true
   def prepare_query(_operation, query, opts) do
     if opts[:skip_tenant_scope] do

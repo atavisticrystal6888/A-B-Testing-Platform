@@ -18,16 +18,19 @@ defmodule ExperimentHub.Workers.GuardrailWorker do
     # The app connects as a superuser, which bypasses FORCE ROW LEVEL
     # SECURITY entirely — without this, queries below aren't blocked, they
     # silently return every tenant's rows instead of just this one's.
-    Repo.put_tenant_id(tenant_id)
+    # `with_tenant/2` guarantees the context is cleared once this job
+    # finishes, on success or exception, so it doesn't linger on this
+    # connection for whatever unrelated caller reuses it next.
+    Repo.with_tenant(tenant_id, fn ->
+      case Repo.get(Experiment, experiment_id) do
+        nil ->
+          Logger.warning("Guardrail worker: experiment #{experiment_id} not found")
+          :ok
 
-    case Repo.get(Experiment, experiment_id) do
-      nil ->
-        Logger.warning("Guardrail worker: experiment #{experiment_id} not found")
-        :ok
-
-      experiment ->
-        check_experiment(experiment)
-    end
+        experiment ->
+          check_experiment(experiment)
+      end
+    end)
   end
 
   defp check_experiment(%Experiment{status: "running"} = experiment) do

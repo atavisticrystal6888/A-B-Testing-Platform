@@ -137,4 +137,29 @@ defmodule ExperimentHub.Workers.AnalysisWorkerTest do
       assert %{config: %{variant_count: 3}} = request
     end
   end
+
+  # Every put_tenant_id/1 caller must clear it deterministically once its
+  # unit of work ends, including when it raises -- see the matching pair of
+  # tests in guardrail_worker_test.exs (which also proves the successful-job
+  # path without touching a real network dependency) and the mechanism-level
+  # proof in repo_test.exs's "with_tenant/2" tests.
+  test "tenant context is cleared even when perform/1 raises" do
+    tenant = tenant_fixture()
+
+    # A malformed experiment_id (not a valid UUID) makes Repo.get/2 raise
+    # Ecto.Query.CastError deep inside perform/1's `with_tenant/2` fun,
+    # before any HTTP call to the statistical engine is attempted.
+    assert_raise Ecto.Query.CastError, fn ->
+      AnalysisWorker.perform(%Oban.Job{
+        args: %{"experiment_id" => "not-a-valid-uuid", "tenant_id" => tenant.id}
+      })
+    end
+
+    refute Repo.current_tenant_id()
+
+    assert {:error, %Postgrex.Error{postgres: %{message: message}}} =
+             Repo.query("SELECT current_setting('app.current_tenant_id')::uuid", [])
+
+    assert message =~ "invalid input syntax for type uuid"
+  end
 end

@@ -49,10 +49,8 @@ defmodule ExperimentHub.DemoSeeds do
     %{tenant: tenant, user: admin, password: admin_password} = DevSeeds.seed_local_admin!()
     ensure_current_partitions!()
 
-    try do
+    Repo.with_tenant(tenant.id, fn ->
       case Repo.transaction(fn ->
-             Repo.put_tenant_id(tenant.id)
-
              users = ensure_users!(tenant)
              metrics = ensure_metrics!(tenant)
              experiments = ensure_experiments!(tenant, metrics, admin)
@@ -87,9 +85,7 @@ defmodule ExperimentHub.DemoSeeds do
         {:error, reason} ->
           raise "demo seed failed: #{inspect(reason)}"
       end
-    after
-      Repo.clear_tenant_id()
-    end
+    end)
   end
 
   defp ensure_current_partitions! do

@@ -26,17 +26,22 @@ defmodule ExperimentHub.Workers.AnalysisWorker do
   def perform(%Oban.Job{
         args: %{"experiment_id" => experiment_id, "tenant_id" => tenant_id} = args
       }) do
-    Repo.put_tenant_id(tenant_id)
-    trace_id = args["trace_id"] || generate_trace_id()
+    # `with_tenant/2` guarantees the tenant context (process dictionary +
+    # session GUC) is cleared once this job finishes, on success or
+    # exception, so it doesn't linger on this connection for whatever
+    # unrelated caller reuses it next.
+    Repo.with_tenant(tenant_id, fn ->
+      trace_id = args["trace_id"] || generate_trace_id()
 
-    case Experiments.get_experiment(experiment_id) do
-      nil ->
-        Logger.warning("Analysis worker: experiment #{experiment_id} not found")
-        :ok
+      case Experiments.get_experiment(experiment_id) do
+        nil ->
+          Logger.warning("Analysis worker: experiment #{experiment_id} not found")
+          :ok
 
-      experiment ->
-        run_analysis(experiment, tenant_id, trace_id)
-    end
+        experiment ->
+          run_analysis(experiment, tenant_id, trace_id)
+      end
+    end)
   end
 
   defp run_analysis(experiment, tenant_id, trace_id) do

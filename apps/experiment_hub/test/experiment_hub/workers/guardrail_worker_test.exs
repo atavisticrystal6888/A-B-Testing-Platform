@@ -131,4 +131,50 @@ defmodule ExperimentHub.Workers.GuardrailWorkerTest do
 
     refute_enqueued(worker: NotificationWorker)
   end
+
+  # Every put_tenant_id/1 caller must clear it deterministically once its
+  # unit of work ends -- including on the job's connection, not just the
+  # process dictionary -- so a pooled Oban worker connection doesn't carry a
+  # stale tenant id into whatever unrelated job or request reuses it next.
+  describe "tenant context is cleared after the job, whether it succeeds or raises" do
+    test "clears after a job runs successfully" do
+      tenant = tenant_fixture()
+      experiment = experiment_fixture(%{tenant: tenant, status: "draft"})
+
+      assert :ok =
+               perform_job(GuardrailWorker, %{
+                 "experiment_id" => experiment.id,
+                 "tenant_id" => tenant.id
+               })
+
+      refute Repo.current_tenant_id()
+
+      assert {:error, %Postgrex.Error{postgres: %{message: message}}} =
+               Repo.query("SELECT current_setting('app.current_tenant_id')::uuid", [])
+
+      assert message =~ "invalid input syntax for type uuid"
+    end
+
+    test "clears even after the job raises" do
+      tenant = tenant_fixture()
+
+      # A malformed experiment_id (not a valid UUID) makes Repo.get/2 raise
+      # Ecto.Query.CastError deep inside perform/1's `with_tenant/2` fun --
+      # a real exception the same shape as a genuinely malformed job payload
+      # would trigger, not a contrived stand-in.
+      assert_raise Ecto.Query.CastError, fn ->
+        perform_job(GuardrailWorker, %{
+          "experiment_id" => "not-a-valid-uuid",
+          "tenant_id" => tenant.id
+        })
+      end
+
+      refute Repo.current_tenant_id()
+
+      assert {:error, %Postgrex.Error{postgres: %{message: message}}} =
+               Repo.query("SELECT current_setting('app.current_tenant_id')::uuid", [])
+
+      assert message =~ "invalid input syntax for type uuid"
+    end
+  end
 end

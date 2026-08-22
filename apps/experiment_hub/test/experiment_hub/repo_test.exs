@@ -76,4 +76,55 @@ defmodule ExperimentHub.RepoTest do
       refute Repo.current_tenant_id()
     end
   end
+
+  # `with_tenant/2` is the shared helper every put_tenant_id/1 caller (Oban
+  # workers, demo seeding) now goes through instead of pairing
+  # put_tenant_id/1 with its own bare clear_tenant_id/0 call — a bare pairing
+  # only clears on the happy path. These tests are the mechanism-level proof
+  # that both the per-process value and the session GUC are cleared
+  # regardless of how `fun` exits, since every call site's guarantee reduces
+  # to this function's.
+  describe "with_tenant/2" do
+    test "clears the tenant context after fun returns normally" do
+      tenant_a = tenant_fixture()
+
+      result =
+        Repo.with_tenant(tenant_a.id, fn ->
+          assert Repo.current_tenant_id() == tenant_a.id
+          :the_result
+        end)
+
+      assert result == :the_result
+      refute Repo.current_tenant_id()
+
+      assert {:error, %Postgrex.Error{postgres: %{message: message}}} =
+               Repo.query(
+                 "SELECT current_setting('app.current_tenant_id')::uuid",
+                 []
+               )
+
+      assert message =~ "invalid input syntax for type uuid"
+    end
+
+    test "clears the tenant context after fun raises" do
+      tenant_a = tenant_fixture()
+
+      assert_raise RuntimeError, "boom", fn ->
+        Repo.with_tenant(tenant_a.id, fn ->
+          assert Repo.current_tenant_id() == tenant_a.id
+          raise "boom"
+        end)
+      end
+
+      refute Repo.current_tenant_id()
+
+      assert {:error, %Postgrex.Error{postgres: %{message: message}}} =
+               Repo.query(
+                 "SELECT current_setting('app.current_tenant_id')::uuid",
+                 []
+               )
+
+      assert message =~ "invalid input syntax for type uuid"
+    end
+  end
 end
