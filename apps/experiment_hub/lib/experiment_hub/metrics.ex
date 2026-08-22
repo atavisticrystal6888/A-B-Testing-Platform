@@ -124,20 +124,39 @@ defmodule ExperimentHub.Metrics do
       %{}
     else
       exp_ids = Map.keys(primary_metric_ids)
+      metric_ids = primary_metric_ids |> Map.values() |> Enum.uniq()
 
+      # Scoped to primary-metric analyses only, and de-duped to the newest
+      # row per {experiment_id, metric_definition_id} directly in SQL (via
+      # DISTINCT ON, expressed as distinct/order_by below) rather than
+      # pulling every historical analysis row back to pick the latest in
+      # Elixir — this stays O(experiments) in rows fetched regardless of how
+      # many analyses have piled up for a long-running experiment.
       latest_analysis_by_key =
         StatisticalAnalysis
-        |> where([sa], sa.experiment_id in ^exp_ids)
-        |> order_by([sa], desc: sa.computed_at)
+        |> where(
+          [sa],
+          sa.experiment_id in ^exp_ids and sa.metric_definition_id in ^metric_ids
+        )
+        |> order_by([sa],
+          asc: sa.experiment_id,
+          asc: sa.metric_definition_id,
+          desc: sa.computed_at
+        )
+        |> distinct([sa], [sa.experiment_id, sa.metric_definition_id])
+        |> select([sa], %{
+          experiment_id: sa.experiment_id,
+          metric_definition_id: sa.metric_definition_id,
+          results: sa.results
+        })
         |> Repo.all()
-        |> Enum.group_by(&{&1.experiment_id, &1.metric_definition_id})
-        |> Map.new(fn {key, [latest | _]} -> {key, latest} end)
+        |> Map.new(fn row -> {{row.experiment_id, row.metric_definition_id}, row.results} end)
 
       Map.new(primary_metric_ids, fn {experiment_id, metric_definition_id} ->
         projection =
           case Map.get(latest_analysis_by_key, {experiment_id, metric_definition_id}) do
             nil -> nil
-            analysis -> get_in(analysis.results, ["projection"])
+            results -> get_in(results, ["projection"])
           end
 
         {experiment_id, projection}

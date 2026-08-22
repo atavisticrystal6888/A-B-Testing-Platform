@@ -16,16 +16,18 @@ function variant(overrides: Partial<Variant> & { key: string; traffic_allocation
 function exp({
   variants,
   hasPrimaryMetric = true,
+  status = "running",
 }: {
   variants: Variant[];
   hasPrimaryMetric?: boolean;
+  status?: Experiment["status"];
 }): Experiment {
   return {
     id: "exp-1",
     key: "exp-key",
     name: "Test Experiment",
     hypothesis: "Test hypothesis",
-    status: "draft",
+    status,
     version: 1,
     archived: false,
     variants,
@@ -152,6 +154,26 @@ describe("evaluateChecklist", () => {
         timelineWithExposureOn(),
       ).find((i) => i.key === "exposures")!;
       expect(item.status).toBe("fail");
+    });
+
+    it("is unknown for a draft experiment regardless of timeline data, and never pass/fail", () => {
+      const item = evaluateChecklist(
+        exp({ variants: evenVariants, status: "draft" }),
+        timelineWithExposureOn(utcDateString(0)),
+      ).find((i) => i.key === "exposures")!;
+
+      expect(item.status).toBe("unknown");
+      expect(item.detail).toBe(
+        "Not applicable before start — assignments begin once the experiment is running.",
+      );
+    });
+
+    it("is unknown for a draft experiment with no timeline data at all", () => {
+      const item = evaluateChecklist(exp({ variants: evenVariants, status: "draft" })).find(
+        (i) => i.key === "exposures",
+      )!;
+
+      expect(item.status).toBe("unknown");
     });
   });
 });

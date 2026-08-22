@@ -104,6 +104,35 @@ describe('ExportMenu — Copy share link', () => {
     expect(screen.getByText('Copy share link')).toBeInTheDocument();
   });
 
+  it('falls back to a copyable URL input when clipboard.writeText rejects, without showing a failure message', async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { url: 'http://localhost/share/readout/tok456' },
+    });
+    vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(
+      new Error('document not focused'),
+    );
+
+    render(<ExportMenu experiment={experiment} results={results} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Copy share link'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText('Failed to create share link.')).not.toBeInTheDocument();
+
+    const input = screen.getByDisplayValue('http://localhost/share/readout/tok456');
+    expect(input).toHaveAttribute('readonly');
+
+    const copyButton = screen.getByRole('button', { name: 'Copy' });
+    fireEvent.click(copyButton);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      'http://localhost/share/readout/tok456',
+    );
+  });
+
   it('surfaces an error message when the share request fails', async () => {
     vi.mocked(api.post).mockRejectedValue(new Error('network down'));
 

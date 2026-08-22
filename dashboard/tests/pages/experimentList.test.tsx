@@ -63,8 +63,19 @@ describe("ExperimentListPage — Time to significance column", () => {
           inserted_at: "2026-08-01T00:00:00Z",
           days_to_significance: null,
         },
+        {
+          id: "exp-paused-stale",
+          key: "exp-paused-stale",
+          name: "Paused Stale ETA Experiment",
+          status: "paused",
+          variant_count: 2,
+          inserted_at: "2026-08-01T00:00:00Z",
+          // Non-null projection left over from before the pause — must not
+          // be rendered as a live ETA once the experiment isn't running.
+          days_to_significance: { status: "estimate", days_remaining: 3 },
+        },
       ],
-      meta: { page: 1, page_size: 20, total: 3, total_pages: 1 },
+      meta: { page: 1, page_size: 20, total: 4, total_pages: 1 },
     });
 
     render(<ExperimentListPage />, { wrapper: createWrapper() });
@@ -72,6 +83,11 @@ describe("ExperimentListPage — Time to significance column", () => {
     expect(await screen.findByText("Estimate Experiment")).toBeInTheDocument();
     expect(screen.getByText("~16d")).toBeInTheDocument();
     expect(screen.getByText("may never")).toBeInTheDocument();
-    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText("~3d")).not.toBeInTheDocument();
+
+    // Two rows should each show a dash: the draft one (no projection at
+    // all) and the paused one (stale non-null projection, suppressed
+    // because the experiment isn't running).
+    expect(screen.getAllByText("—")).toHaveLength(2);
   });
 });

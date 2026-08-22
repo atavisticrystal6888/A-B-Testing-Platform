@@ -86,6 +86,30 @@ describe('LaunchChecklistModal', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it('shows "Start experiment" ENABLED for a draft experiment with primary metric and full allocation, even though exposures is unknown', async () => {
+    // healthyExperiment() is status: "draft" with a primary metric attached
+    // and 5000/5000 allocation. Timeline data (with a today-dated exposure)
+    // is deliberately provided to prove the draft-exposures-are-unknown
+    // rule wins regardless of what the timeline says — it must not read as
+    // "pass" just because there happens to be recent exposure data.
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        lifecycle: [],
+        daily_exposures: [{ date: new Date().toISOString().slice(0, 10), count: 5 }],
+      },
+    });
+
+    render(
+      <LaunchChecklistModal experiment={healthyExperiment()} onConfirm={vi.fn()} onCancel={vi.fn()} />,
+      { wrapper: createWrapper() },
+    );
+
+    const startButton = await screen.findByRole('button', { name: 'Start experiment' });
+    expect(startButton).not.toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Start anyway' })).not.toBeInTheDocument();
+    expect(screen.getByText("Couldn't verify")).toBeInTheDocument();
+  });
+
   it('disables "Start experiment" and requires explicit override confirmation when a check fails', async () => {
     // No primary metric attached -> primary_metric check fails.
     const experiment = healthyExperiment();

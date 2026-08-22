@@ -68,7 +68,7 @@ defmodule ExperimentHubWeb.ShareController do
       |> put_resp_header("x-robots-tag", "noindex")
       |> put_resp_header(
         "content-security-policy",
-        "default-src 'none'; style-src 'unsafe-inline'"
+        "default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'; sandbox"
       )
       |> put_resp_content_type("text/html")
       |> send_resp(200, shared_readout.html)

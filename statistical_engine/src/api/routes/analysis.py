@@ -239,6 +239,13 @@ def _analyze_metric(metric: MetricInput, request: AnalysisRequest) -> MetricResu
         proj = project_days_to_significance(
             minimum_required_per_variant=minimum_required,
             current_total=control_n + treatment_n,
+            # Mirrors the pairwise control/treatment assumption used at
+            # lines ~250/291 (this analysis only ever compares one control
+            # to one treatment). The Elixir side's exposure rate, though,
+            # counts assignments across *all* variants of the experiment —
+            # so for a 3+-arm experiment this projection under-counts how
+            # many exposures actually land in this pair per day, making the
+            # days-to-significance estimate optimistic.
             num_variants=2,
             exposure_rate_per_day=request.config.exposure_rate_per_day,
         )

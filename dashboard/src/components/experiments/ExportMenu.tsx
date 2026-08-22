@@ -20,6 +20,7 @@ interface ShareReadoutResponse {
 export function ExportMenu({ experiment, results }: ExportMenuProps) {
   const [error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
 
   const exportResults = (format: "csv" | "json") => {
     setError(null);
@@ -33,18 +34,38 @@ export function ExportMenu({ experiment, results }: ExportMenuProps) {
     if (!results) return;
 
     setError(null);
+    setShareUrl(null);
+
+    let url: string;
     try {
       const html = buildReadoutHtml(experiment, results);
       const response = await api.post<ShareReadoutResponse>(
         `/api/v1/experiments/${experiment.id}/share-readout`,
         { html },
       );
-      await navigator.clipboard.writeText(response.data.url);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
+      url = response.data.url;
     } catch (err) {
       setError(describeApiError(err, "Failed to create share link."));
+      return;
     }
+
+    // The share link itself was created successfully at this point — a
+    // clipboard failure past here (Safari revokes the write permission once
+    // this async gap has passed since the click) is not a share failure, so
+    // it must never surface as "Failed to create share link." Fall back to
+    // a copyable input the user can select/copy by hand instead.
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      setShareUrl(url);
+    }
+  };
+
+  const copyShareUrlInput = () => {
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl);
   };
 
   return (
@@ -80,6 +101,23 @@ export function ExportMenu({ experiment, results }: ExportMenuProps) {
       >
         Export JSON
       </button>
+      {shareUrl && (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            readOnly
+            value={shareUrl}
+            onFocus={(e) => e.currentTarget.select()}
+            className="px-2 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 rounded-lg w-64"
+          />
+          <button
+            onClick={copyShareUrlInput}
+            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Copy
+          </button>
+        </div>
+      )}
       {error && <span className="text-xs text-red-600">{error}</span>}
     </div>
   );

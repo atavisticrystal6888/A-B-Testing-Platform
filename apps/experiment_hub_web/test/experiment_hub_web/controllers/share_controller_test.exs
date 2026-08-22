@@ -3,6 +3,7 @@ defmodule ExperimentHubWeb.ShareControllerTest do
 
   alias ExperimentHub.Experiments
   alias ExperimentHub.Repo
+  alias ExperimentHubWeb.Plugs.SessionAuth
 
   @salt "shared-readout"
 
@@ -66,6 +67,24 @@ defmodule ExperimentHubWeb.ShareControllerTest do
       assert response["error"] == "validation_error"
       assert response["errors"]["html"]
     end
+
+    test "403s a viewer-role principal — sharing a readout requires editor+", %{tenant: tenant} do
+      experiment = experiment_fixture(tenant: tenant)
+      viewer = user_fixture(%{tenant: tenant, role: "viewer"})
+      token = SessionAuth.generate_token(viewer)
+
+      conn =
+        Phoenix.ConnTest.build_conn()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("content-type", "application/json")
+        |> put_req_header("authorization", "Bearer " <> token)
+        |> post("/api/v1/experiments/#{experiment.id}/share-readout", %{
+          "html" => "<html><body>readout</body></html>"
+        })
+
+      response = json_response(conn, 403)
+      assert response["error"] == "forbidden"
+    end
   end
 
   describe "GET /share/readout/:token" do
@@ -99,7 +118,7 @@ defmodule ExperimentHubWeb.ShareControllerTest do
       assert get_resp_header(conn, "x-robots-tag") == ["noindex"]
 
       assert get_resp_header(conn, "content-security-policy") == [
-               "default-src 'none'; style-src 'unsafe-inline'"
+               "default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'; sandbox"
              ]
     end
 

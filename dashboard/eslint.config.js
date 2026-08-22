@@ -23,6 +23,11 @@ export default [
         Blob: "readonly",
         SVGSVGElement: "readonly",
         KeyboardEvent: "readonly",
+        HTMLDivElement: "readonly",
+        HTMLElement: "readonly",
+        HTMLSpanElement: "readonly",
+        HTMLHeadingElement: "readonly",
+        HTMLInputElement: "readonly",
       },
       parser: tsParser,
       parserOptions: {

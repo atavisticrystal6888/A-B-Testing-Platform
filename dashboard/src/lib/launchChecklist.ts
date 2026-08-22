@@ -58,7 +58,25 @@ function evaluateAllocation(experiment: Experiment): ChecklistItem {
   };
 }
 
-function evaluateExposures(timeline: ExperimentTimeline | undefined, now: Date): ChecklistItem {
+function evaluateExposures(
+  experiment: Experiment,
+  timeline: ExperimentTimeline | undefined,
+  now: Date,
+): ChecklistItem {
+  // Before the experiment has started, there's nothing to observe yet — a
+  // draft experiment has never been assigned a user, so "no recent
+  // exposures" isn't a signal of anything wrong. Report unknown
+  // unconditionally rather than reading (necessarily empty, or stale from a
+  // prior run of the same key) timeline data.
+  if (experiment.status === "draft") {
+    return {
+      key: "exposures",
+      label: "Recent exposure activity",
+      status: "unknown",
+      detail: "Not applicable before start — assignments begin once the experiment is running.",
+    };
+  }
+
   if (!timeline) {
     return {
       key: "exposures",
@@ -89,6 +107,6 @@ export function evaluateChecklist(
   return [
     evaluatePrimaryMetric(experiment),
     evaluateAllocation(experiment),
-    evaluateExposures(timeline, new Date()),
+    evaluateExposures(experiment, timeline, new Date()),
   ];
 }

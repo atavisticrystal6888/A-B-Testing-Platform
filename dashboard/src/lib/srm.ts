@@ -12,6 +12,10 @@ const FPMIN = 1e-300;
 
 /** Lanczos approximation of ln(Gamma(x)) for x > 0. */
 function logGamma(xx: number): number {
+  // These are the canonical Numerical Recipes lgamma coefficients — the
+  // literals are pinned exactly as published, and the nearest representable
+  // double is intended, not a mistake (tests pin the resulting outputs).
+  /* eslint-disable no-loss-of-precision */
   const cof = [
     76.18009172947146,
     -86.50532032941677,
@@ -20,6 +24,7 @@ function logGamma(xx: number): number {
     0.1208650973866179e-2,
     -0.5395239384953e-5,
   ];
+  /* eslint-enable no-loss-of-precision */
   let x = xx;
   let y = xx;
   let tmp = x + 5.5;
@@ -29,6 +34,7 @@ function logGamma(xx: number): number {
     y += 1;
     ser += cof[j] / y;
   }
+  // eslint-disable-next-line no-loss-of-precision -- canonical Numerical Recipes constant (sqrt(2*pi)), nearest double intended.
   return -tmp + Math.log((2.5066282746310005 * ser) / x);
 }
 

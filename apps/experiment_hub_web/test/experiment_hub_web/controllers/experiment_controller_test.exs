@@ -201,6 +201,66 @@ defmodule ExperimentHubWeb.ExperimentControllerTest do
       assert row["days_to_significance"] == %{"status" => "estimate", "days_remaining" => 16}
     end
 
+    test "surfaces only the newer of two analyses for the same primary metric", %{
+      conn: conn,
+      tenant: tenant
+    } do
+      experiment = create_experiment(conn, "projection-latest-test", "Projection Latest Test")
+
+      {:ok, metric_def} =
+        Metrics.create_metric_definition(%{
+          "tenant_id" => tenant.id,
+          "key" => "projection-latest-metric",
+          "name" => "Projection Latest Metric",
+          "metric_type" => "count",
+          "definition" => %{"event_name" => "test"}
+        })
+
+      {:ok, _} =
+        Metrics.attach_metric(%{
+          "tenant_id" => tenant.id,
+          "experiment_id" => experiment["id"],
+          "metric_definition_id" => metric_def.id,
+          "role" => "primary"
+        })
+
+      base_attrs = %{
+        tenant_id: tenant.id,
+        experiment_id: experiment["id"],
+        metric_definition_id: metric_def.id,
+        analysis_type: "frequentist",
+        methodology: "z_test_proportions",
+        parameters: %{},
+        sample_sizes: %{}
+      }
+
+      {:ok, _older} =
+        %ExperimentHub.Metrics.StatisticalAnalysis{}
+        |> ExperimentHub.Metrics.StatisticalAnalysis.changeset(
+          Map.merge(base_attrs, %{
+            computed_at: ~U[2026-08-01 00:00:00Z],
+            results: %{"projection" => %{"status" => "estimate", "days_remaining" => 30}}
+          })
+        )
+        |> Repo.insert()
+
+      {:ok, _newer} =
+        %ExperimentHub.Metrics.StatisticalAnalysis{}
+        |> ExperimentHub.Metrics.StatisticalAnalysis.changeset(
+          Map.merge(base_attrs, %{
+            computed_at: ~U[2026-08-10 00:00:00Z],
+            results: %{"projection" => %{"status" => "estimate", "days_remaining" => 5}}
+          })
+        )
+        |> Repo.insert()
+
+      conn = get(conn, "/api/v1/experiments")
+      response = json_response(conn, 200)
+
+      row = Enum.find(response["data"], &(&1["key"] == "projection-latest-test"))
+      assert row["days_to_significance"] == %{"status" => "estimate", "days_remaining" => 5}
+    end
+
     test "filters by status", %{conn: conn, tenant: tenant} do
       create_experiment(conn, "draft-exp", "Draft")
 

@@ -88,9 +88,6 @@ defmodule ExperimentHubWeb.Router do
     get "/experiments/:experiment_id/export", ExportController, :export_experiment
     get "/experiments/:experiment_id/export/results", ExportController, :export_results
 
-    # Shareable readout link (Roadmap #7)
-    post "/experiments/:experiment_id/share-readout", ShareController, :create
-
     # Tenant
     get "/tenant", TenantController, :show
     get "/tenant/settings", TenantController, :settings
@@ -128,6 +125,11 @@ defmodule ExperimentHubWeb.Router do
 
     post "/experiments/:experiment_id/metrics", ExperimentMetricController, :create
     delete "/experiments/:experiment_id/metrics/:id", ExperimentMetricController, :delete
+
+    # Shareable readout link (Roadmap #7): creating a link exposes the
+    # experiment's readout to anyone who gets the URL, so it's editor+ only
+    # (same trust tier as other create/update routes in this block).
+    post "/experiments/:experiment_id/share-readout", ShareController, :create
 
     # Feature flags management
     post "/flags", FeatureFlagController, :create

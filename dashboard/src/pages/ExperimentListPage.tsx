@@ -154,7 +154,7 @@ export default function ExperimentListPage() {
                     {new Date(exp.inserted_at).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600 tabular-nums">
-                    {formatProjection(exp.days_to_significance)}
+                    {exp.status === "running" ? formatProjection(exp.days_to_significance) : "—"}
                   </td>
                 </tr>
               ))}

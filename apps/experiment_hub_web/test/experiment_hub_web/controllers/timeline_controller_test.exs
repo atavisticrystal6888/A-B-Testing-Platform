@@ -82,6 +82,26 @@ defmodule ExperimentHubWeb.TimelineControllerTest do
       assert Enum.find(daily_exposures, &(&1["date"] == "2026-08-02"))["count"] == 1
     end
 
+    test "does not emit a duplicate Concluded marker for a seeded scheduled_end row", %{
+      conn: conn,
+      tenant: tenant
+    } do
+      experiment = experiment_fixture(tenant: tenant)
+
+      # ConclusionService writes "concluded"; ScheduledEndWorker separately
+      # logs "scheduled_end" for the very same transition. Only the former
+      # should ever surface as a lifecycle entry.
+      {:ok, _log} = AuditLog.log_experiment_change(experiment, "concluded", actor_type: "system")
+
+      {:ok, _log} =
+        AuditLog.log_experiment_change(experiment, "scheduled_end", actor_type: "system")
+
+      response = json_response(get(conn, "/api/v1/experiments/#{experiment.id}/timeline"), 200)
+
+      actions = Enum.map(response["data"]["lifecycle"], & &1["action"])
+      assert actions == ["concluded"]
+    end
+
     test "returns 404 for a different tenant's experiment", %{conn: conn} do
       other_tenant = tenant_fixture()
       other_experiment = experiment_fixture(tenant: other_tenant)

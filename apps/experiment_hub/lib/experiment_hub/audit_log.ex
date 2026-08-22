@@ -25,7 +25,7 @@ defmodule ExperimentHub.AuditLog do
     field(:reason, :string)
     field(:metadata, :map, default: %{})
 
-    timestamps(type: :utc_datetime, updated_at: false)
+    timestamps(type: :utc_datetime_usec, updated_at: false)
   end
 
   def changeset(log, attrs) do
