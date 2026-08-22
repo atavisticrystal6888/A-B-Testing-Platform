@@ -59,8 +59,13 @@ defmodule ExperimentHub.TestSupport.RLSProbe do
   @doc """
   Ensures the probe role exists -- idempotent, so it's safe to call every
   test run against a persistent local database, not just a freshly created
-  one -- and can `SELECT` the given tables, with neither `SUPERUSER` nor
-  `BYPASSRLS` so `FORCE ROW LEVEL SECURITY` actually binds it.
+  one -- and can `SELECT`, `INSERT`, `UPDATE`, and `DELETE` on the given
+  tables, with neither `SUPERUSER` nor `BYPASSRLS` so `FORCE ROW LEVEL
+  SECURITY` actually binds it. All four privileges are granted (not just
+  SELECT) so tests can prove the `tenant_isolation` policy's write-path
+  enforcement (its `USING` expression doubles as the `WITH CHECK` for
+  INSERT/UPDATE, since the policy declares no separate `WITH CHECK` and no
+  `FOR` clause), not only its read-path filtering.
   """
   def ensure_probe_role!(admin, tables) do
     Postgrex.query!(
@@ -80,7 +85,11 @@ defmodule ExperimentHub.TestSupport.RLSProbe do
     Postgrex.query!(admin, "GRANT USAGE ON SCHEMA public TO #{@probe_role}", [])
 
     Enum.each(tables, fn table ->
-      Postgrex.query!(admin, "GRANT SELECT ON #{table} TO #{@probe_role}", [])
+      Postgrex.query!(
+        admin,
+        "GRANT SELECT, INSERT, UPDATE, DELETE ON #{table} TO #{@probe_role}",
+        []
+      )
     end)
 
     :ok
