@@ -6,6 +6,7 @@ import { useExperimentResults } from "../hooks/useResults";
 import { useDetachMetric } from "../hooks/useExperimentMetrics";
 import { useWebSocket } from "../contexts/WebSocketContext";
 import { ConcludeModal } from "../components/experiments/ConcludeModal";
+import { LaunchChecklistModal } from "../components/experiments/LaunchChecklistModal";
 import { AttachMetricModal } from "../components/experiments/AttachMetricModal";
 import { ExportMenu } from "../components/experiments/ExportMenu";
 import { SegmentBreakdownCard } from "../components/experiments/SegmentBreakdownCard";
@@ -226,6 +227,7 @@ function ProjectionLine({ projection }: { projection: ProjectionResult }) {
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [isConcludeModalOpen, setIsConcludeModalOpen] = useState(false);
+  const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const { subscribeToExperiment } = useWebSocket();
   const { data: experiment, isLoading: expLoading, error: expError } = useExperiment(id!);
@@ -293,7 +295,7 @@ export default function ExperimentDetailPage() {
           </Link>
           {experiment.status === "draft" && (
             <button
-              onClick={() => startAction.mutate(id!)}
+              onClick={() => setIsLaunchModalOpen(true)}
               disabled={startAction.isPending}
               className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:cursor-not-allowed disabled:bg-green-500"
             >
@@ -329,6 +331,16 @@ export default function ExperimentDetailPage() {
           )}
         </div>
       </div>
+
+      {isLaunchModalOpen && (
+        <LaunchChecklistModal
+          experiment={experiment}
+          isPending={startAction.isPending}
+          errorMessage={startAction.isError ? "Unable to start the experiment right now." : undefined}
+          onConfirm={() => startAction.mutate(id!, { onSuccess: () => setIsLaunchModalOpen(false) })}
+          onCancel={() => setIsLaunchModalOpen(false)}
+        />
+      )}
 
       {isConcludeModalOpen && (
         <ConcludeModal
