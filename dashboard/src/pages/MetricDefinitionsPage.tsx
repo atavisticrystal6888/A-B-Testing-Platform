@@ -77,7 +77,18 @@ export default function MetricDefinitionsPage() {
                 <tr
                   key={metric.id}
                   onClick={() => setPanelState({ mode: "edit", id: metric.id })}
-                  className="hover:bg-gray-50 transition-colors cursor-pointer"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      if (event.key === " ") {
+                        event.preventDefault();
+                      }
+                      setPanelState({ mode: "edit", id: metric.id });
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Edit metric ${metric.name}`}
+                  className="hover:bg-gray-50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-inset"
                 >
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">{metric.name}</td>
                   <td className="px-6 py-4 text-sm font-mono text-gray-500">{metric.key}</td>

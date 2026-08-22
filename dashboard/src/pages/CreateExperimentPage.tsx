@@ -253,6 +253,7 @@ export function CreateExperimentPage() {
   const [serverFieldErrors, setServerFieldErrors] = useState<Record<string, string[]>>({});
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const isFirstStepRender = useRef(true);
 
   useEffect(() => {
     if (!isKeyDirty) {
@@ -260,10 +261,17 @@ export function CreateExperimentPage() {
     }
   }, [isKeyDirty, name]);
 
-  // Move focus to the step heading whenever the active step changes, so
+  // Move focus to the step heading whenever the active step CHANGES, so
   // keyboard and screen-reader users land somewhere meaningful instead of
-  // wherever the mouse happens to be.
+  // wherever the mouse happens to be. Skip the very first run (initial
+  // mount) so we don't yank focus away from the skip-link target or
+  // wherever the user landed before this page rendered.
   useEffect(() => {
+    if (isFirstStepRender.current) {
+      isFirstStepRender.current = false;
+      return;
+    }
+
     stepHeadingRef.current?.focus();
   }, [step]);
 
