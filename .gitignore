@@ -85,3 +85,6 @@ k6/results/
 /tmp/event_buffer/
 
 graphify-out/
+
+# Agent scratch: plan ledgers and fix reports, not project history
+.superpowers/
