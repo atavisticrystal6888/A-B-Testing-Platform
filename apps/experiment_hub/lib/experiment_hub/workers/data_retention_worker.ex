@@ -24,16 +24,25 @@ defmodule ExperimentHub.Workers.DataRetentionWorker do
         |> DateTime.add(-retention_days * 86400, :second)
         |> DateTime.truncate(:second)
 
+      # Ecto loads :binary_id/:uuid columns as their 36-char string form on
+      # the struct, but raw SQL via Repo.query!/2 isn't routed through
+      # Ecto's type system -- Postgrex infers the $1 placeholder's type from
+      # the `tenant_id uuid` column it's compared against and its uuid
+      # extension expects the 16-byte binary encoding, not the string form.
+      # Without dump!/1 this raises DBConnection.EncodeError before any row
+      # is touched.
+      tenant_id = Ecto.UUID.dump!(s.tenant_id)
+
       # Purge old raw events
       Repo.query!(
         "DELETE FROM experiment_events_raw WHERE tenant_id = $1 AND inserted_at < $2",
-        [s.tenant_id, cutoff]
+        [tenant_id, cutoff]
       )
 
       # Purge old daily results
       Repo.query!(
         "DELETE FROM experiment_results_daily WHERE tenant_id = $1 AND inserted_at < $2",
-        [s.tenant_id, cutoff]
+        [tenant_id, cutoff]
       )
     end)
 

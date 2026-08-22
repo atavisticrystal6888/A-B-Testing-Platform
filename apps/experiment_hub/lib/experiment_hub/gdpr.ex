@@ -21,10 +21,15 @@ defmodule ExperimentHub.GDPR do
       )
       |> Repo.update_all(set: [user_id: anonymized_user_id])
 
-      # Anonymize raw events
+      # Anonymize raw events. tenant_id is compared against a `uuid`
+      # column, so Postgrex infers a uuid-typed placeholder for $2 and its
+      # uuid extension expects the 16-byte binary encoding, not Ecto's
+      # 36-char string form -- dump!/1 converts it; user_id (both the
+      # incoming value and the anonymized replacement) is a plain VARCHAR
+      # column and needs no conversion.
       Repo.query!(
         "UPDATE experiment_events_raw SET user_id = $1, properties = '{}'::jsonb WHERE tenant_id = $2 AND user_id = $3",
-        [anonymized_user_id, tenant_id, user_id]
+        [anonymized_user_id, Ecto.UUID.dump!(tenant_id), user_id]
       )
 
       # Anonymize assignment overrides
