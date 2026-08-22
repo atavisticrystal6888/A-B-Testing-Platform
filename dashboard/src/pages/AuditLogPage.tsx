@@ -13,7 +13,7 @@ export function AuditLogPage() {
     <div className="max-w-5xl mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Audit Trail</h1>
 
-      <div className="flex gap-3 mb-6">
+      <div className="flex flex-wrap gap-3 mb-6">
         <select
           value={resourceType}
           onChange={(e) => setResourceType(e.target.value)}

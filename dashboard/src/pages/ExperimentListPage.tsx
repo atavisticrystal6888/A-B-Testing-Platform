@@ -59,13 +59,13 @@ export default function ExperimentListPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-4 mb-6">
+      <div className="flex flex-wrap gap-4 mb-6">
         <input
           type="text"
           placeholder="Search experiments..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+          className="min-w-0 flex-1 max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
         />
         <select
           value={statusFilter}
@@ -103,7 +103,8 @@ export default function ExperimentListPage() {
 
       {data && data.data.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -156,6 +157,7 @@ export default function ExperimentListPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

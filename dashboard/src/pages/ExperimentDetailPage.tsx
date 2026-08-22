@@ -107,7 +107,8 @@ function VariantTable({ experiment, results }: { experiment: Experiment; results
       <div className="px-6 py-4 border-b border-gray-100">
         <h3 className="text-sm font-semibold text-gray-900">Variant Performance</h3>
       </div>
-      <table className="w-full">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px]">
         <thead>
           <tr className="bg-gray-50/50 border-b border-gray-100">
             <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Variant</th>
@@ -161,6 +162,7 @@ function VariantTable({ experiment, results }: { experiment: Experiment; results
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -301,15 +303,15 @@ export default function ExperimentDetailPage() {
   return (
     <div className="p-8 max-w-6xl">
       {/* Header */}
-      <div className="flex items-start justify-between mb-8">
-        <div>
+      <div className="flex flex-col gap-4 mb-8 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900">{experiment.name}</h1>
           <p className="text-sm text-gray-500 mt-1">{experiment.key}</p>
           {experiment.hypothesis && (
             <p className="text-sm text-gray-600 mt-2 max-w-2xl">{experiment.hypothesis}</p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             to={`/experiments/${id}/timeline`}
             className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"

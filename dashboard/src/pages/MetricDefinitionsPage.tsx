@@ -51,7 +51,8 @@ export default function MetricDefinitionsPage() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200">
+          <div className="overflow-x-auto">
+          <table className="min-w-[640px] w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
@@ -85,6 +86,7 @@ export default function MetricDefinitionsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

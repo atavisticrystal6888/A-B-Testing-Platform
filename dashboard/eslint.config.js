@@ -21,6 +21,8 @@ export default [
         console: "readonly",
         HTMLFormElement: "readonly",
         Blob: "readonly",
+        SVGSVGElement: "readonly",
+        KeyboardEvent: "readonly",
       },
       parser: tsParser,
       parserOptions: {
