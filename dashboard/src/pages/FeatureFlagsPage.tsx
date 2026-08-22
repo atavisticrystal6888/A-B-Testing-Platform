@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { FeatureFlagList } from '../components/flags/FeatureFlagList';
 import { FeatureFlagDetailPanel } from '../components/flags/FeatureFlagDetailPanel';
 import { api } from '../lib/api';
+import { LoadingState, ErrorState } from '../components/ui/QueryStates';
 
 interface Flag {
   id: string;
@@ -15,7 +16,7 @@ interface Flag {
 
 export function FeatureFlagsPage() {
   const [selectedFlagId, setSelectedFlagId] = useState<string | null>(null);
-  const { data: flags = [], isLoading, isError } = useQuery({
+  const { data: flags = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['feature-flags'],
     queryFn: () =>
       api
@@ -33,11 +34,9 @@ export function FeatureFlagsPage() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500">Loading flags...</div>
+        <LoadingState label="Loading flags..." />
       ) : isError ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-8 text-center text-sm text-red-700">
-          Unable to load feature flags right now.
-        </div>
+        <ErrorState error={error} onRetry={() => refetch()} message="Unable to load feature flags right now." />
       ) : (
         <FeatureFlagList flags={flags} onSelect={setSelectedFlagId} />
       )}

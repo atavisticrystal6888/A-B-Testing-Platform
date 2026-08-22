@@ -12,6 +12,7 @@ import { ExportMenu } from "../components/experiments/ExportMenu";
 import { SegmentBreakdownCard } from "../components/experiments/SegmentBreakdownCard";
 import { DecisionPanel } from "../components/experiments/DecisionPanel";
 import { SrmWarningBanner } from "../components/experiments/SrmWarningBanner";
+import { LoadingState, ErrorState } from "../components/ui/QueryStates";
 import type { AnalysisResults, ConclusionDecision, Experiment, MetricResult, ProjectionResult } from "../lib/types";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
@@ -230,7 +231,7 @@ export default function ExperimentDetailPage() {
   const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const { subscribeToExperiment } = useWebSocket();
-  const { data: experiment, isLoading: expLoading, error: expError } = useExperiment(id!);
+  const { data: experiment, isLoading: expLoading, error: expError, refetch: refetchExperiment } = useExperiment(id!);
   const { data: results } = useExperimentResults(id!);
   const startAction = useExperimentAction("start");
   const analyzeAction = useExperimentAction("analyze");
@@ -249,9 +250,31 @@ export default function ExperimentDetailPage() {
     return unsubscribe;
   }, [id, queryClient, subscribeToExperiment]);
 
-  if (expLoading) return <div className="p-8 text-gray-500">Loading...</div>;
-  if (expError) return <div className="p-8 text-red-500">Unable to load experiment details.</div>;
-  if (!experiment) return <div className="p-8 text-red-500">Experiment not found</div>;
+  if (expLoading) {
+    return (
+      <div className="p-8">
+        <LoadingState label="Loading experiment..." />
+      </div>
+    );
+  }
+  if (expError) {
+    return (
+      <div className="p-8">
+        <ErrorState
+          error={expError}
+          onRetry={() => refetchExperiment()}
+          message="Unable to load experiment details."
+        />
+      </div>
+    );
+  }
+  if (!experiment) {
+    return (
+      <div className="p-8">
+        <ErrorState message="Experiment not found." />
+      </div>
+    );
+  }
 
   const hasAnalysisResults = (results?.metrics.length ?? 0) > 0;
   const primaryMetric = hasAnalysisResults ? results?.metrics.find((m: MetricResult) => m.role === "primary") : undefined;

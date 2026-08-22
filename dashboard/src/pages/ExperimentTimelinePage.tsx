@@ -14,6 +14,7 @@ import {
 import { useExperiment } from "../hooks/useExperiments";
 import { api } from "../lib/api";
 import { TimelineChart } from "../components/charts/TimelineChart";
+import { LoadingState, ErrorState, EmptyState } from "../components/ui/QueryStates";
 import type { ExperimentTimeline } from "../lib/types";
 
 function useExperimentTimeline(id: string) {
@@ -34,11 +35,12 @@ const ACTION_LABELS: Record<string, string> = {
 
 export default function ExperimentTimelinePage() {
   const { id } = useParams<{ id: string }>();
-  const { data: experiment, isLoading: expLoading, error: expError } = useExperiment(id!);
+  const { data: experiment, isLoading: expLoading, error: expError, refetch: refetchExperiment } = useExperiment(id!);
   const {
     data: timelineResponse,
     isLoading: timelineLoading,
     error: timelineError,
+    refetch: refetchTimeline,
   } = useExperimentTimeline(id!);
 
   const timeline = timelineResponse?.data;
@@ -53,11 +55,34 @@ export default function ExperimentTimelinePage() {
     });
   }, [timeline]);
 
-  if (expLoading || timelineLoading) return <div className="p-8 text-gray-500">Loading...</div>;
-  if (expError || timelineError) {
-    return <div className="p-8 text-red-500">Unable to load experiment timeline.</div>;
+  if (expLoading || timelineLoading) {
+    return (
+      <div className="p-8">
+        <LoadingState label="Loading timeline..." />
+      </div>
+    );
   }
-  if (!experiment || !timeline) return <div className="p-8 text-red-500">Experiment not found</div>;
+  if (expError || timelineError) {
+    return (
+      <div className="p-8">
+        <ErrorState
+          error={expError ?? timelineError}
+          onRetry={() => {
+            refetchExperiment();
+            refetchTimeline();
+          }}
+          message="Unable to load experiment timeline."
+        />
+      </div>
+    );
+  }
+  if (!experiment || !timeline) {
+    return (
+      <div className="p-8">
+        <ErrorState message="Experiment not found." />
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 max-w-6xl">
@@ -89,9 +114,7 @@ export default function ExperimentTimelinePage() {
         <h3 className="text-sm font-semibold text-gray-900 mb-4">Cumulative Exposures</h3>
 
         {cumulativeExposures.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 text-sm">
-            No exposures recorded yet.
-          </div>
+          <EmptyState title="No exposures recorded yet." />
         ) : (
           <ResponsiveContainer width="100%" height={280}>
             <AreaChart data={cumulativeExposures}>
@@ -132,9 +155,7 @@ export default function ExperimentTimelinePage() {
         </div>
 
         {timeline.lifecycle.length === 0 ? (
-          <div className="p-12 text-center text-gray-500 text-sm">
-            No lifecycle events recorded yet.
-          </div>
+          <EmptyState title="No lifecycle events recorded yet." className="py-12" />
         ) : (
           <ul className="divide-y divide-gray-100">
             {timeline.lifecycle.map((event, i) => (

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useExperiments } from "../hooks/useExperiments";
+import { LoadingState, ErrorState, EmptyState } from "../components/ui/QueryStates";
 import type { ExperimentStatus, ExperimentSummary, ProjectionResult } from "../lib/types";
 
 const STATUS_COLORS: Record<ExperimentStatus, string> = {
@@ -38,7 +39,7 @@ export default function ExperimentListPage() {
   if (statusFilter) params.status = statusFilter;
   if (search) params.search = search;
 
-  const { data, isLoading, error } = useExperiments(params);
+  const { data, isLoading, error, refetch } = useExperiments(params);
 
   return (
     <div className="p-8">
@@ -80,26 +81,24 @@ export default function ExperimentListPage() {
       </div>
 
       {/* List */}
-      {isLoading && (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
-      )}
+      {isLoading && <LoadingState label="Loading experiments..." />}
 
       {error && (
-        <div className="text-center py-12 text-red-500">
-          Failed to load experiments
-        </div>
+        <ErrorState error={error} onRetry={() => refetch()} message="Failed to load experiments." />
       )}
 
       {data && data.data.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500 mb-4">No experiments found</p>
-          <Link
-            to="/experiments/new"
-            className="text-indigo-600 hover:text-indigo-700 font-medium"
-          >
-            Create your first experiment
-          </Link>
-        </div>
+        <EmptyState
+          title="No experiments found"
+          cta={
+            <Link
+              to="/experiments/new"
+              className="text-indigo-600 hover:text-indigo-700 font-medium"
+            >
+              Create your first experiment
+            </Link>
+          }
+        />
       )}
 
       {data && data.data.length > 0 && (

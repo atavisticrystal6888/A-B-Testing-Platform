@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useExperiments } from '../hooks/useExperiments';
 import { api } from '../lib/api';
+import { LoadingState, ErrorState, EmptyState } from '../components/ui/QueryStates';
 import type { ExperimentStatus, ExperimentSummary } from '../lib/types';
 
 interface PlatformOverview {
@@ -154,15 +155,21 @@ export function PlatformDashboardPage() {
   });
 
   if (overviewQuery.isLoading) {
-    return <div className="flex h-64 items-center justify-center text-sm text-gray-500">Loading dashboard...</div>;
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        <LoadingState label="Loading dashboard..." className="py-16" />
+      </div>
+    );
   }
 
   if (overviewQuery.isError || !overviewQuery.data) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-          Unable to load the platform dashboard right now.
-        </div>
+        <ErrorState
+          error={overviewQuery.error}
+          onRetry={() => overviewQuery.refetch()}
+          message="Unable to load the platform dashboard right now."
+        />
       </div>
     );
   }
@@ -265,17 +272,26 @@ export function PlatformDashboardPage() {
 
           <div className="mt-6 space-y-3">
             {recentExperimentsQuery.isLoading ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                Loading experiments...
-              </div>
+              <LoadingState label="Loading experiments..." />
             ) : recentExperimentsQuery.isError ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-8 text-center text-sm text-red-600">
-                Unable to load recent experiments.
-              </div>
+              <ErrorState
+                error={recentExperimentsQuery.error}
+                onRetry={() => recentExperimentsQuery.refetch()}
+                message="Unable to load recent experiments."
+              />
             ) : recentExperiments.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                No experiments yet. Create your first draft to start building the portfolio.
-              </div>
+              <EmptyState
+                title="No experiments yet."
+                hint="Create your first draft to start building the portfolio."
+                cta={
+                  <Link
+                    to="/experiments/new"
+                    className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                  >
+                    Create Experiment
+                  </Link>
+                }
+              />
             ) : (
               recentExperiments.map((experiment: ExperimentSummary) => {
                 const nextAction =
@@ -365,17 +381,15 @@ export function PlatformDashboardPage() {
 
           <div className="mt-6 space-y-3">
             {activityQuery.isLoading ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                Loading audit activity...
-              </div>
+              <LoadingState label="Loading audit activity..." />
             ) : activityQuery.isError ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-8 text-center text-sm text-red-600">
-                Unable to load recent activity.
-              </div>
+              <ErrorState
+                error={activityQuery.error}
+                onRetry={() => activityQuery.refetch()}
+                message="Unable to load recent activity."
+              />
             ) : recentActivity.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                No activity has been recorded yet.
-              </div>
+              <EmptyState title="No activity has been recorded yet." />
             ) : (
               recentActivity.map((log: AuditLogItem) => (
                 <div key={log.id} className="rounded-2xl border border-slate-200 px-4 py-4">
@@ -404,9 +418,13 @@ export function PlatformDashboardPage() {
 
             <div className="mt-6 space-y-3">
               {activityQuery.isLoading ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                  Checking alerts...
-                </div>
+                <LoadingState label="Checking alerts..." />
+              ) : activityQuery.isError ? (
+                <ErrorState
+                  error={activityQuery.error}
+                  onRetry={() => activityQuery.refetch()}
+                  message="Unable to check for guardrail alerts."
+                />
               ) : guardrailAlerts.length === 0 ? (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-8 text-center text-sm text-emerald-700">
                   No recent guardrail breaches detected.

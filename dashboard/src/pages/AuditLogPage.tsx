@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useAuditLogs } from '../hooks/useAuditLogs';
 import type { AuditLog } from '../hooks/useAuditLogs';
 import { AuditLogEntryComponent } from '../components/admin/AuditLogEntry';
+import { LoadingState, ErrorState, EmptyState } from '../components/ui/QueryStates';
 
 export function AuditLogPage() {
   const [actionFilter, setActionFilter] = useState('');
   const [resourceType, setResourceType] = useState('');
-  const { data: auditLogs, isLoading } = useAuditLogs({ action: actionFilter, resource_type: resourceType });
+  const { data: auditLogs, isLoading, error, refetch } = useAuditLogs({ action: actionFilter, resource_type: resourceType });
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4">
@@ -40,9 +41,17 @@ export function AuditLogPage() {
 
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center text-gray-500">Loading audit logs...</div>
+          <div className="p-12">
+            <LoadingState label="Loading audit logs..." className="" />
+          </div>
+        ) : error ? (
+          <div className="p-12">
+            <ErrorState error={error} onRetry={() => refetch()} message="Unable to load audit logs right now." />
+          </div>
         ) : auditLogs?.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">No audit log entries found.</div>
+          <div className="p-12">
+            <EmptyState title="No audit log entries found." />
+          </div>
         ) : (
           auditLogs?.map((entry: AuditLog) => (
             <AuditLogEntryComponent key={entry.id} entry={entry} />

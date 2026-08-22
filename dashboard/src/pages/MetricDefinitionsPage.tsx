@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useMetricDefinitions } from "../hooks/useMetricDefinitions";
 import { MetricDefinitionPanel } from "../components/metrics/MetricDefinitionPanel";
+import { LoadingState, ErrorState, EmptyState } from "../components/ui/QueryStates";
 import type { MetricDefinition } from "../lib/types";
 
 type PanelState = { mode: "create" } | { mode: "edit"; id: string } | null;
 
 export default function MetricDefinitionsPage() {
-  const { data: metrics = [], isLoading, isError } = useMetricDefinitions();
+  const { data: metrics = [], isLoading, isError, error, refetch } = useMetricDefinitions();
   const [panelState, setPanelState] = useState<PanelState>(null);
 
   return (
@@ -27,16 +28,26 @@ export default function MetricDefinitionsPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-12 text-center text-gray-500">
-          Loading metrics...
+        <div className="rounded-xl border border-gray-200 bg-white p-12">
+          <LoadingState label="Loading metrics..." className="" />
         </div>
       ) : isError ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-12 text-center text-red-600">
-          Failed to load metric definitions.
+        <div className="rounded-xl border border-gray-200 bg-white p-12">
+          <ErrorState error={error} onRetry={() => refetch()} message="Failed to load metric definitions." />
         </div>
       ) : metrics.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-12 text-center text-gray-500">
-          No metric definitions are available yet.
+        <div className="rounded-xl border border-gray-200 bg-white p-12">
+          <EmptyState
+            title="No metric definitions are available yet."
+            cta={
+              <button
+                onClick={() => setPanelState({ mode: "create" })}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm"
+              >
+                Create Metric
+              </button>
+            }
+          />
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
