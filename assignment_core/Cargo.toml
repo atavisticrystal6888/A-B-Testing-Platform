@@ -6,6 +6,11 @@ description = "Deterministic variant assignment library using MurmurHash3"
 
 [lib]
 name = "assignment_core"
+# Order matters: Rustler copies the FIRST artifact cargo reports, so "cdylib"
+# must stay ahead of "lib". With "lib" first it copies the .rlib (a static Rust
+# archive) to priv/native/assignment_core.dll, the NIF fails to load, and the
+# Elixir golden-vector test silently falls back to the pure-Elixir hash.
+# Both artifacts are emitted either way; cargo test and the benches need the rlib.
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
