@@ -10,6 +10,7 @@ erl_crash.dump
 # Rust
 assignment_core/target/
 *.rs.bk
+/apps/assignment_engine/priv/native/
 
 # Python
 __pycache__/

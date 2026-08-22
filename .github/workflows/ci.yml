@@ -20,6 +20,7 @@ jobs:
       DB_HOST: localhost
       DB_PORT: "5432"
       REDIS_URL: redis://localhost:6380
+      ASSIGNMENT_ENGINE_BUILD_NIF: "1"
     services:
       postgres:
         image: postgres:16-alpine
@@ -42,6 +43,11 @@ jobs:
         with:
           elixir-version: "1.20"
           otp-version: "27"
+      # The assignment_engine NIF (apps/assignment_engine/lib/assignment_engine/native.ex)
+      # builds the Rust assignment_core crate when ASSIGNMENT_ENGINE_BUILD_NIF=1, so the
+      # golden-vector parity test (native_test.exs) actually runs against the compiled
+      # NIF here instead of silently falling back to the pure-Elixir implementation.
+      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/cache@v4
         with:
           path: |
@@ -49,6 +55,12 @@ jobs:
             _build
           key: mix-${{ runner.os }}-${{ hashFiles('mix.lock') }}
           restore-keys: mix-${{ runner.os }}-
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            assignment_core/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('assignment_core/Cargo.lock') }}
       - run: mix deps.get
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors

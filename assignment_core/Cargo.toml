@@ -6,7 +6,7 @@ description = "Deterministic variant assignment library using MurmurHash3"
 
 [lib]
 name = "assignment_core"
-crate-type = ["lib", "cdylib"]
+crate-type = ["cdylib", "lib"]
 
 [dependencies]
 murmur3 = "0.5"
