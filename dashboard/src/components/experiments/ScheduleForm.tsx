@@ -11,10 +11,11 @@ export function ScheduleForm({ scheduledStartAt, scheduledEndAt, onChange }: Sch
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
+          <label htmlFor="schedule-start-at" className="block text-xs font-medium text-gray-600 mb-1">
             Start Date & Time
           </label>
           <input
+            id="schedule-start-at"
             type="datetime-local"
             value={scheduledStartAt || ''}
             onChange={(e) => onChange('scheduled_start_at', e.target.value)}
@@ -26,10 +27,11 @@ export function ScheduleForm({ scheduledStartAt, scheduledEndAt, onChange }: Sch
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
+          <label htmlFor="schedule-end-at" className="block text-xs font-medium text-gray-600 mb-1">
             End Date & Time
           </label>
           <input
+            id="schedule-end-at"
             type="datetime-local"
             value={scheduledEndAt || ''}
             onChange={(e) => onChange('scheduled_end_at', e.target.value)}

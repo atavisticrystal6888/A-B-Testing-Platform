@@ -178,6 +178,13 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-indigo-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+      >
+        Skip to content
+      </a>
+
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div
@@ -218,6 +225,7 @@ export default function Layout() {
                 to={item.path}
                 title={item.label}
                 onClick={closeMobile}
+                aria-current={isActive ? "page" : undefined}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
                   collapsed ? "md:justify-center md:gap-0 md:px-2" : ""
                 } ${
@@ -285,7 +293,7 @@ export default function Layout() {
           <span className="text-lg font-bold text-gray-900">ExperimentHub</span>
         </header>
 
-        <main className="min-w-0 flex-1 overflow-auto">
+        <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 overflow-auto">
           <Outlet />
         </main>
       </div>

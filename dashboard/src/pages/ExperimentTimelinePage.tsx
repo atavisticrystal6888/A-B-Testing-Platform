@@ -116,36 +116,48 @@ export default function ExperimentTimelinePage() {
         {cumulativeExposures.length === 0 ? (
           <EmptyState title="No exposures recorded yet." />
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={cumulativeExposures}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="#9ca3af" />
-              <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
-              <Tooltip />
-              <Area
-                type="monotone"
-                dataKey="cumulative"
-                stroke="#6366f1"
-                fill="#6366f1"
-                fillOpacity={0.2}
-                name="Cumulative exposures"
-              />
-              {timeline.lifecycle.map((event, i) => (
-                <ReferenceLine
-                  key={`${event.action}-${i}`}
-                  x={event.at.slice(0, 10)}
-                  stroke="#9ca3af"
-                  strokeDasharray="3 3"
-                  label={{
-                    value: ACTION_LABELS[event.action] ?? event.action,
-                    position: "top",
-                    fontSize: 10,
-                    fill: "#6b7280",
-                  }}
+          <figure
+            role="img"
+            aria-label={`Cumulative exposures chart over ${cumulativeExposures.length} days, reaching ${cumulativeExposures[
+              cumulativeExposures.length - 1
+            ].cumulative.toLocaleString()} total exposures.`}
+          >
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={cumulativeExposures}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="#9ca3af" />
+                <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
+                <Tooltip />
+                <Area
+                  type="monotone"
+                  dataKey="cumulative"
+                  stroke="#6366f1"
+                  fill="#6366f1"
+                  fillOpacity={0.2}
+                  name="Cumulative exposures"
                 />
-              ))}
-            </AreaChart>
-          </ResponsiveContainer>
+                {timeline.lifecycle.map((event, i) => (
+                  <ReferenceLine
+                    key={`${event.action}-${i}`}
+                    x={event.at.slice(0, 10)}
+                    stroke="#9ca3af"
+                    strokeDasharray="3 3"
+                    label={{
+                      value: ACTION_LABELS[event.action] ?? event.action,
+                      position: "top",
+                      fontSize: 10,
+                      fill: "#6b7280",
+                    }}
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+            <figcaption className="sr-only">
+              Cumulative exposures over {cumulativeExposures.length} days, reaching{" "}
+              {cumulativeExposures[cumulativeExposures.length - 1].cumulative.toLocaleString()}{" "}
+              total exposures.
+            </figcaption>
+          </figure>
         )}
       </div>
 

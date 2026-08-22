@@ -1,3 +1,16 @@
 @import "tailwindcss";
 
 @source "../src";
+
+/* Roadmap #11: shared visible focus treatment for interactive elements,
+   so we don't have to hand-add focus-visible classes everywhere. */
+@layer base {
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"] {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500;
+  }
+}

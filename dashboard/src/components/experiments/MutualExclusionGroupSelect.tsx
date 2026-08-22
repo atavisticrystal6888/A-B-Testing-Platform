@@ -35,10 +35,11 @@ export function MutualExclusionGroupSelect({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor="mutual-exclusion-group" className="block text-sm font-medium text-gray-700 mb-1">
         Mutual Exclusion Group
       </label>
       <select
+        id="mutual-exclusion-group"
         value={selectedGroupId || ''}
         onChange={(e) => onChange(e.target.value || undefined)}
         disabled={isLoading || isUnsupported}

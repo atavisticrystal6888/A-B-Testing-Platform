@@ -24,9 +24,17 @@ const MOCK_DATA = Array.from({ length: 14 }, (_, i) => ({
 
 export default function ConversionOverTimeChart({ experimentId: _experimentId }: Props) {
   const data = MOCK_DATA;
+  const latest = data[data.length - 1];
+  const chartLabel = `Conversion rate over time chart, ${data.length} days. Latest: control ${(
+    latest.control * 100
+  ).toFixed(2)}%, treatment ${(latest.treatment * 100).toFixed(2)}%.`;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+    <figure
+      role="img"
+      aria-label={chartLabel}
+      className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm"
+    >
       <h3 className="text-sm font-semibold text-gray-900 mb-4">
         Conversion Rate Over Time
       </h3>
@@ -66,6 +74,7 @@ export default function ConversionOverTimeChart({ experimentId: _experimentId }:
           />
         </LineChart>
       </ResponsiveContainer>
-    </div>
+      <figcaption className="sr-only">{chartLabel}</figcaption>
+    </figure>
   );
 }

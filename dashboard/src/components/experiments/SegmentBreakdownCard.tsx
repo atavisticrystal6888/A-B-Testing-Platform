@@ -146,14 +146,19 @@ export function SegmentBreakdownCard({ experimentId }: { experimentId: string })
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
+            <caption className="sr-only">
+              Descriptive conversion rate by {data?.data.attribute}, split by variant. Not
+              significance-tested.
+            </caption>
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                   {data?.data.attribute}
                 </th>
                 {variantKeys.map((key) => (
                   <th
                     key={key}
+                    scope="col"
                     className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase"
                   >
                     {key}
@@ -164,14 +169,14 @@ export function SegmentBreakdownCard({ experimentId }: { experimentId: string })
             <tbody className="divide-y divide-gray-100">
               {segments.map((segment) => (
                 <tr key={segment.segment} className="hover:bg-gray-50/50">
-                  <td className="px-6 py-3 font-medium text-gray-900">
+                  <th scope="row" className="px-6 py-3 text-left font-medium text-gray-900">
                     {segment.segment}
-                    <span className="ml-2 text-xs text-gray-400">
+                    <span className="ml-2 text-xs font-normal text-gray-400 tabular-nums">
                       n={segment.total_sample_size.toLocaleString()}
                     </span>
-                  </td>
+                  </th>
                   {segment.variants.map((variant) => (
-                    <td key={variant.variant_key} className="px-6 py-3 text-right text-gray-700">
+                    <td key={variant.variant_key} className="px-6 py-3 text-right text-gray-700 tabular-nums">
                       {variant.conversion_rate != null
                         ? `${(variant.conversion_rate * 100).toFixed(1)}%`
                         : "—"}

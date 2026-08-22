@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ConclusionDecision, Variant } from "../../lib/types";
 
 interface ConcludeModalProps {
@@ -21,6 +21,25 @@ export function ConcludeModal({
   const [decision, setDecision] = useState<ConclusionDecision | "">("");
   const [rationale, setRationale] = useState("");
   const [winnerVariantId, setWinnerVariantId] = useState("");
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    firstFocusable?.focus();
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onCancel();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
 
   const decisions = [
     { value: "ship_variant", label: "Ship Variant", description: "Roll out the winning variant to all users" },
@@ -32,9 +51,15 @@ export function ConcludeModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="conclude-modal-title"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden"
+      >
         <div className="px-6 py-5 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">Conclude Experiment</h2>
+          <h2 id="conclude-modal-title" className="text-lg font-semibold text-gray-900">Conclude Experiment</h2>
           <p className="text-sm text-gray-500 mt-1">{experimentName}</p>
         </div>
 
@@ -108,12 +133,14 @@ export function ConcludeModal({
 
         <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
           <button
+            type="button"
             onClick={onCancel}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={() => decision && onConfirm(decision, rationale, winnerVariantId || undefined)}
             disabled={!canConfirm || isPending}
             className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

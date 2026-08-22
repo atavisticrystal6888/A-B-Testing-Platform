@@ -29,10 +29,21 @@ export default function ConfidenceIntervalChart({ results }: Props) {
     },
   ];
 
+  const confidenceLevel = (primaryMetric.frequentist.confidence_level * 100).toFixed(0);
+  const chartLabel = `Confidence interval chart. Point estimate ${(ci.point_estimate * 100).toFixed(
+    2,
+  )} percentage points, ${confidenceLevel}% confidence interval from ${(ci.lower * 100).toFixed(
+    2,
+  )} to ${(ci.upper * 100).toFixed(2)} percentage points.`;
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+    <figure
+      role="img"
+      aria-label={chartLabel}
+      className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm"
+    >
       <h3 className="text-sm font-semibold text-gray-900 mb-4">
-        Confidence Interval ({(primaryMetric.frequentist.confidence_level * 100).toFixed(0)}%)
+        Confidence Interval ({confidenceLevel}%)
       </h3>
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={data} layout="vertical">
@@ -53,13 +64,14 @@ export default function ConfidenceIntervalChart({ results }: Props) {
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      <div className="flex justify-between text-xs text-gray-500 mt-2">
+      <div className="flex justify-between text-xs text-gray-500 mt-2" aria-hidden="true">
         <span>{(ci.lower * 100).toFixed(2)}pp</span>
         <span className="font-medium text-gray-700">
           {(ci.point_estimate * 100).toFixed(2)}pp
         </span>
         <span>{(ci.upper * 100).toFixed(2)}pp</span>
       </div>
-    </div>
+      <figcaption className="sr-only">{chartLabel}</figcaption>
+    </figure>
   );
 }

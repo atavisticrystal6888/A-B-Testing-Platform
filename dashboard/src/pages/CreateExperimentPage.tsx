@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateExperiment } from '../hooks/useExperiments';
 import { TargetingRuleBuilder } from '../components/experiments/TargetingRuleBuilder';
@@ -252,12 +252,28 @@ export function CreateExperimentPage() {
   const [validationErrors, setValidationErrors] = useState<FieldErrors>({});
   const [serverFieldErrors, setServerFieldErrors] = useState<Record<string, string[]>>({});
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     if (!isKeyDirty) {
       setKey(slugifyExperimentKey(name));
     }
   }, [isKeyDirty, name]);
+
+  // Move focus to the step heading whenever the active step changes, so
+  // keyboard and screen-reader users land somewhere meaningful instead of
+  // wherever the mouse happens to be.
+  useEffect(() => {
+    stepHeadingRef.current?.focus();
+  }, [step]);
+
+  /** Enter inside a plain text/number/date input advances the wizard, same as clicking Next/Create. */
+  const handleEnterKey = (action: () => void) => (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      action();
+    }
+  };
 
   const totalTraffic = variants.reduce((sum, v) => sum + v.traffic_allocation, 0);
 
@@ -387,16 +403,18 @@ export function CreateExperimentPage() {
       )}
 
       {/* Step indicator */}
-      <div className="flex items-center mb-8">
+      <ol className="flex items-center mb-8">
         {steps.map((s, i) => (
-          <div key={s} className="flex items-center">
+          <li key={s} className="flex items-center" aria-current={step === i + 1 ? 'step' : undefined}>
             <button
+              type="button"
               onClick={() => {
                 if (i + 1 <= step) {
                   setStep(i + 1);
                   setValidationErrors({});
                 }
               }}
+              aria-label={`Step ${i + 1}: ${s}`}
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
                 step === i + 1
                   ? 'bg-indigo-600 text-white'
@@ -408,31 +426,37 @@ export function CreateExperimentPage() {
               {i + 1}
             </button>
             <span className="ml-2 text-sm text-gray-600">{s}</span>
-            {i < steps.length - 1 && <div className="w-12 h-0.5 bg-gray-200 mx-3" />}
-          </div>
+            {i < steps.length - 1 && <div className="w-12 h-0.5 bg-gray-200 mx-3" aria-hidden="true" />}
+          </li>
         ))}
-      </div>
+      </ol>
 
       {/* Step 1: Hypothesis */}
       {step === 1 && (
         <div className="space-y-4">
+          <h2 ref={stepHeadingRef} tabIndex={-1} className="text-lg font-semibold text-gray-900 focus:outline-none">
+            {steps[0]}
+          </h2>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Experiment Name</label>
+            <label htmlFor="exp-name" className="block text-sm font-medium text-gray-700 mb-1">Experiment Name</label>
             <input
+              id="exp-name"
               type="text"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
                 resetSubmissionState();
               }}
+              onKeyDown={handleEnterKey(() => handleNextStep(2))}
               className={`w-full px-3 py-2 border rounded-lg text-sm ${combinedFieldError('name') ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
               placeholder="Checkout Button Color"
             />
             {combinedFieldError('name') && <p className="mt-1 text-xs text-red-600">{combinedFieldError('name')}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Key</label>
+            <label htmlFor="exp-key" className="block text-sm font-medium text-gray-700 mb-1">Key</label>
             <input
+              id="exp-key"
               type="text"
               value={key}
               onChange={(e) => {
@@ -440,6 +464,7 @@ export function CreateExperimentPage() {
                 setIsKeyDirty(true);
                 resetSubmissionState();
               }}
+              onKeyDown={handleEnterKey(() => handleNextStep(2))}
               className={`w-full px-3 py-2 border rounded-lg text-sm font-mono ${combinedFieldError('key') ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
               placeholder="checkout-button-color"
             />
@@ -450,8 +475,9 @@ export function CreateExperimentPage() {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hypothesis</label>
+            <label htmlFor="exp-hypothesis" className="block text-sm font-medium text-gray-700 mb-1">Hypothesis</label>
             <textarea
+              id="exp-hypothesis"
               value={hypothesis}
               onChange={(e) => {
                 setHypothesis(e.target.value);
@@ -463,14 +489,16 @@ export function CreateExperimentPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Feature Tag</label>
+            <label htmlFor="exp-feature-tag" className="block text-sm font-medium text-gray-700 mb-1">Feature Tag</label>
             <input
+              id="exp-feature-tag"
               type="text"
               value={featureTag}
               onChange={(e) => {
                 setFeatureTag(e.target.value);
                 resetSubmissionState();
               }}
+              onKeyDown={handleEnterKey(() => handleNextStep(2))}
               className={`w-full px-3 py-2 border rounded-lg text-sm ${combinedFieldError('feature_tag') ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
               placeholder="checkout-page"
             />
@@ -479,6 +507,7 @@ export function CreateExperimentPage() {
             )}
           </div>
           <button
+            type="button"
             onClick={() => handleNextStep(2)}
             className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
           >
@@ -490,6 +519,9 @@ export function CreateExperimentPage() {
       {/* Step 2: Variants */}
       {step === 2 && (
         <div className="space-y-4">
+          <h2 ref={stepHeadingRef} tabIndex={-1} className="text-lg font-semibold text-gray-900 focus:outline-none">
+            {steps[1]}
+          </h2>
           {combinedFieldError('variants') && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {combinedFieldError('variants')}
@@ -501,6 +533,7 @@ export function CreateExperimentPage() {
                 <span className="text-sm font-medium text-gray-700">Variant {i + 1} {v.is_control && '(Control)'}</span>
                 {!v.is_control && variants.length > 2 && (
                   <button
+                    type="button"
                     onClick={() => {
                       setVariants(variants.filter((_, j) => j !== i));
                       resetSubmissionState();
@@ -513,7 +546,11 @@ export function CreateExperimentPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label htmlFor={`variant-${i}-key`} className="sr-only">
+                    Variant {i + 1} key
+                  </label>
                   <input
+                    id={`variant-${i}-key`}
                     type="text"
                     value={v.key}
                     onChange={(e) => {
@@ -522,6 +559,7 @@ export function CreateExperimentPage() {
                       setVariants(nextVariants);
                       resetSubmissionState();
                     }}
+                    onKeyDown={handleEnterKey(() => handleNextStep(3))}
                     placeholder="Key"
                     className={`w-full px-3 py-2 border rounded-lg text-sm ${combinedFieldError(`variants.${i}.key`) ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
                   />
@@ -530,7 +568,11 @@ export function CreateExperimentPage() {
                   )}
                 </div>
                 <div>
+                  <label htmlFor={`variant-${i}-name`} className="sr-only">
+                    Variant {i + 1} name
+                  </label>
                   <input
+                    id={`variant-${i}-name`}
                     type="text"
                     value={v.name}
                     onChange={(e) => {
@@ -539,6 +581,7 @@ export function CreateExperimentPage() {
                       setVariants(nextVariants);
                       resetSubmissionState();
                     }}
+                    onKeyDown={handleEnterKey(() => handleNextStep(3))}
                     placeholder="Name"
                     className={`w-full px-3 py-2 border rounded-lg text-sm ${combinedFieldError(`variants.${i}.name`) ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
                   />
@@ -550,6 +593,7 @@ export function CreateExperimentPage() {
             </div>
           ))}
           <button
+            type="button"
             onClick={() => {
               setVariants([...variants, { key: '', name: '', is_control: false, traffic_allocation: 0 }]);
               resetSubmissionState();
@@ -560,6 +604,7 @@ export function CreateExperimentPage() {
           </button>
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={() => {
                 setStep(1);
                 setValidationErrors({});
@@ -569,6 +614,7 @@ export function CreateExperimentPage() {
               Back
             </button>
             <button
+              type="button"
               onClick={() => handleNextStep(3)}
               className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg"
             >
@@ -581,10 +627,16 @@ export function CreateExperimentPage() {
       {/* Step 3: Traffic */}
       {step === 3 && (
         <div className="space-y-4">
+          <h2 ref={stepHeadingRef} tabIndex={-1} className="text-lg font-semibold text-gray-900 focus:outline-none">
+            {steps[2]}
+          </h2>
           {variants.map((v, i) => (
             <div key={i} className="flex items-center gap-4">
-              <span className="w-32 text-sm text-gray-700">{v.name || v.key}</span>
+              <label htmlFor={`variant-${i}-traffic`} className="w-32 text-sm text-gray-700">
+                {v.name || v.key}
+              </label>
               <input
+                id={`variant-${i}-traffic`}
                 type="range"
                 min={0}
                 max={10000}
@@ -607,6 +659,7 @@ export function CreateExperimentPage() {
           {combinedFieldError('traffic') && <p className="text-xs text-red-600">{combinedFieldError('traffic')}</p>}
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={() => {
                 setStep(2);
                 setValidationErrors({});
@@ -616,6 +669,7 @@ export function CreateExperimentPage() {
               Back
             </button>
             <button
+              type="button"
               onClick={() => handleNextStep(4)}
               className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg"
             >
@@ -628,9 +682,13 @@ export function CreateExperimentPage() {
       {/* Step 4: Power (optional — skippable via Next) */}
       {step === 4 && (
         <div className="space-y-4">
+          <h2 ref={stepHeadingRef} tabIndex={-1} className="text-lg font-semibold text-gray-900 focus:outline-none">
+            {steps[3]}
+          </h2>
           <PowerCalculatorStep numVariants={variants.length} />
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={() => {
                 setStep(3);
                 setValidationErrors({});
@@ -640,6 +698,7 @@ export function CreateExperimentPage() {
               Back
             </button>
             <button
+              type="button"
               onClick={() => handleNextStep(5)}
               className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg"
             >
@@ -652,6 +711,9 @@ export function CreateExperimentPage() {
       {/* Step 5: Settings */}
       {step === 5 && (
         <div className="space-y-6">
+          <h2 ref={stepHeadingRef} tabIndex={-1} className="text-lg font-semibold text-gray-900 focus:outline-none">
+            {steps[4]}
+          </h2>
           <ScheduleForm
             scheduledStartAt={scheduledStartAt}
             scheduledEndAt={scheduledEndAt}
@@ -692,6 +754,7 @@ export function CreateExperimentPage() {
           )}
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={() => {
                 setStep(4);
                 setValidationErrors({});
@@ -700,7 +763,12 @@ export function CreateExperimentPage() {
             >
               Back
             </button>
-            <button onClick={handleSubmit} disabled={createExperiment.isPending} className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={createExperiment.isPending}
+              className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
               {createExperiment.isPending ? 'Creating...' : 'Create Experiment'}
             </button>
           </div>

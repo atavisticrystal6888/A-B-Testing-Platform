@@ -44,6 +44,7 @@ export function TargetingRuleBuilder({ rules, onChange }: TargetingRuleBuilderPr
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium text-gray-700">Targeting Rules</h4>
         <button
+          type="button"
           onClick={addRule}
           className="text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
         >
@@ -57,14 +58,22 @@ export function TargetingRuleBuilder({ rules, onChange }: TargetingRuleBuilderPr
 
       {rules.map((rule, index) => (
         <div key={index} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+          <label htmlFor={`targeting-rule-${index}-attribute`} className="sr-only">
+            Rule {index + 1} attribute
+          </label>
           <input
+            id={`targeting-rule-${index}-attribute`}
             type="text"
             value={rule.attribute}
             onChange={(e) => updateRule(index, 'attribute', e.target.value)}
             placeholder="Attribute (e.g. country)"
             className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
           />
+          <label htmlFor={`targeting-rule-${index}-operator`} className="sr-only">
+            Rule {index + 1} operator
+          </label>
           <select
+            id={`targeting-rule-${index}-operator`}
             value={rule.operator}
             onChange={(e) => updateRule(index, 'operator', e.target.value)}
             className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
@@ -73,7 +82,11 @@ export function TargetingRuleBuilder({ rules, onChange }: TargetingRuleBuilderPr
               <option key={op.value} value={op.value}>{op.label}</option>
             ))}
           </select>
+          <label htmlFor={`targeting-rule-${index}-value`} className="sr-only">
+            Rule {index + 1} value
+          </label>
           <input
+            id={`targeting-rule-${index}-value`}
             type="text"
             value={rule.value}
             onChange={(e) => updateRule(index, 'value', e.target.value)}
@@ -81,7 +94,9 @@ export function TargetingRuleBuilder({ rules, onChange }: TargetingRuleBuilderPr
             className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
           />
           <button
+            type="button"
             onClick={() => removeRule(index)}
+            aria-label={`Remove rule ${index + 1}`}
             className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
           >
             ✕

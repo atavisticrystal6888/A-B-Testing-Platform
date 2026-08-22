@@ -45,8 +45,12 @@ export function TimelineChart({ experiments }: TimelineChartProps) {
     }
   }
 
+  const chartLabel = `Experiment timeline chart, ${data.length} experiment${
+    data.length === 1 ? "" : "s"
+  }.${overlaps.length > 0 ? ` ${overlaps.length} overlapping period${overlaps.length > 1 ? "s" : ""} detected.` : ""}`;
+
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
+    <figure role="img" aria-label={chartLabel} className="rounded-xl border border-gray-200 bg-white p-6">
       <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-4">
         Experiment Timeline
       </h3>
@@ -87,6 +91,7 @@ export function TimelineChart({ experiments }: TimelineChartProps) {
           </p>
         </div>
       )}
-    </div>
+      <figcaption className="sr-only">{chartLabel}</figcaption>
+    </figure>
   );
 }

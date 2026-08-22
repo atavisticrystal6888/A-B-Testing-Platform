@@ -109,13 +109,16 @@ function VariantTable({ experiment, results }: { experiment: Experiment; results
       </div>
       <div className="overflow-x-auto">
       <table className="w-full min-w-[640px]">
+        <caption className="sr-only">
+          Per-variant performance: traffic share, sample size, conversion rate, and lift versus control.
+        </caption>
         <thead>
           <tr className="bg-gray-50/50 border-b border-gray-100">
-            <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Variant</th>
-            <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Traffic</th>
-            <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Sample Size</th>
-            <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Conv. Rate</th>
-            <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Lift</th>
+            <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Variant</th>
+            <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Traffic</th>
+            <th scope="col" className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Sample Size</th>
+            <th scope="col" className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Conv. Rate</th>
+            <th scope="col" className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Lift</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -139,16 +142,16 @@ function VariantTable({ experiment, results }: { experiment: Experiment; results
                   </div>
                   <div className="text-xs text-gray-500">{variant.key}</div>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-600">
+                <td className="px-6 py-4 text-sm text-gray-600 tabular-nums">
                   {(variant.traffic_allocation / 100).toFixed(1)}%
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-600 text-right">
+                <td className="px-6 py-4 text-sm text-gray-600 text-right tabular-nums">
                   {stats?.sample_size?.toLocaleString() ?? "—"}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-900 text-right font-medium">
+                <td className="px-6 py-4 text-sm text-gray-900 text-right font-medium tabular-nums">
                   {stats?.conversion_rate != null ? `${(stats.conversion_rate * 100).toFixed(2)}%` : "—"}
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-6 py-4 text-right tabular-nums">
                   {lift != null ? (
                     <span className={`text-sm font-medium ${lift > 0 ? "text-green-600" : lift < 0 ? "text-red-600" : "text-gray-500"}`}>
                       {lift > 0 ? "+" : ""}{lift.toFixed(2)}%
