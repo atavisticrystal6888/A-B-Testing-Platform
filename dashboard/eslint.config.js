@@ -28,6 +28,8 @@ export default [
         HTMLSpanElement: "readonly",
         HTMLHeadingElement: "readonly",
         HTMLInputElement: "readonly",
+        HTMLButtonElement: "readonly",
+        Node: "readonly",
       },
       parser: tsParser,
       parserOptions: {

@@ -88,7 +88,27 @@ describe("InfoTip", () => {
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
   });
 
-  it("stays open when the popover's own text is clicked, but still closes when blur goes elsewhere", () => {
+  it("prevents the popover's mousedown default, so clicking its text can never blur the trigger", () => {
+    // This is what actually keeps a pinned tip open when its own
+    // (non-focusable) text is clicked: browsers blur the currently focused
+    // element on a mousedown that lands on a non-focusable target, so
+    // preventing that default is what stops the blur from firing at all —
+    // there's no relatedTarget to inspect otherwise, since nothing would
+    // gain focus.
+    render(<InfoTip term="p_value" />);
+    const button = screen.getByRole("button", { name: "What is p-value?" });
+    fireEvent.click(button);
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toBeInTheDocument();
+
+    const mousedownEvent = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    tooltip.dispatchEvent(mousedownEvent);
+
+    expect(mousedownEvent.defaultPrevented).toBe(true);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+  });
+
+  it("still closes a pinned tip when blur genuinely moves focus elsewhere", () => {
     render(
       <div>
         <InfoTip term="p_value" />
@@ -98,18 +118,47 @@ describe("InfoTip", () => {
 
     const button = screen.getByRole("button", { name: "What is p-value?" });
     fireEvent.click(button);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+
+    fireEvent.blur(button);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("regression: a hover-close after clicking the popover text must not leave stale state that swallows a later, real blur", () => {
+    // Reported QA bug against the mousedown-flag version of this fix: the
+    // flag was set by the popover mousedown and only ever consumed inside
+    // handleBlur, but a hover-opened (never pinned) tip closes via
+    // handleMouseLeave, which never touched the flag — so it survived past
+    // the close and silently swallowed the next, unrelated blur. The fixed
+    // implementation carries no state across events, so there's nothing
+    // left to go stale here.
+    render(
+      <div>
+        <InfoTip term="p_value" />
+        <button>elsewhere</button>
+      </div>,
+    );
+
+    const button = screen.getByRole("button", { name: "What is p-value?" });
+
+    // Opened by hover — the trigger never takes focus.
+    fireEvent.mouseEnter(button);
     const tooltip = screen.getByRole("tooltip");
     expect(tooltip).toBeInTheDocument();
 
-    // Clicking the popover's own (non-focusable) text fires a mousedown on
-    // it followed by a native blur on the button — the pinned tip must
-    // survive that.
+    // Click the popover's own (non-focusable) text.
     fireEvent.mouseDown(tooltip);
-    fireEvent.blur(button);
+
+    // Mouse leaves the popover — never pinned, so this closes it.
+    fireEvent.mouseLeave(tooltip);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    // The user tabs onto the icon...
+    fireEvent.focus(button);
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
 
-    // A later, unrelated blur (focus genuinely moving elsewhere) still
-    // closes it.
+    // ...then tabs away to a genuinely different element. This must close
+    // it — the old flag-based version failed this exact step.
     fireEvent.blur(button);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });

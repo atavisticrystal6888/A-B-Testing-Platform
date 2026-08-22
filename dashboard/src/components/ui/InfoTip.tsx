@@ -1,4 +1,12 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { GLOSSARY, type StatsTerm } from "../../lib/statsGlossary";
 
 function seenKey(term: StatsTerm): string {
@@ -50,12 +58,6 @@ export function InfoTip({ term }: InfoTipProps) {
   const [align, setAlign] = useState<Align>("center");
   const tooltipId = useId();
   const popoverRef = useRef<HTMLSpanElement>(null);
-  // Set on mousedown inside the popover and consumed by the very next blur.
-  // The popover's text isn't focusable, so clicking it still fires a native
-  // blur on the button; this flag lets that blur be told apart from a
-  // genuine "focus left the component" blur, without permanently
-  // swallowing later, unrelated blurs (it's reset as soon as it's read).
-  const popoverMouseDownRef = useRef(false);
 
   const openTip = () => {
     setOpen(true);
@@ -70,18 +72,29 @@ export function InfoTip({ term }: InfoTipProps) {
     setPinned(false);
   };
 
-  const handleBlur = () => {
-    if (popoverMouseDownRef.current) {
-      // The blur was caused by clicking inside our own popover, not by
-      // focus moving elsewhere — ignore it (once) so a pinned tip stays open.
-      popoverMouseDownRef.current = false;
+  // Closes on blur unless focus is moving somewhere inside our own popover
+  // (there's nothing focusable in there today, but this covers it if that
+  // ever changes) — determined by containment, not by any state left over
+  // from an earlier event, so there's nothing that can go stale between
+  // renders.
+  const handleBlur = (event: FocusEvent<HTMLButtonElement>) => {
+    const next = event.relatedTarget;
+    if (next instanceof Node && popoverRef.current?.contains(next)) {
       return;
     }
     closeTip();
   };
 
-  const handlePopoverMouseDown = () => {
-    popoverMouseDownRef.current = true;
+  // The popover's definition text isn't focusable, so a mousedown on it
+  // wouldn't move focus anywhere — relatedTarget on the resulting blur would
+  // just be null, which containment alone can't tell apart from "focus left
+  // for good". Preventing the mousedown's default action stops the browser
+  // from blurring the trigger button in the first place, so no blur fires
+  // for this click at all (the same technique listbox/combobox
+  // implementations use to keep focus on their input while clicking a
+  // non-focusable option).
+  const handlePopoverMouseDown = (event: ReactMouseEvent) => {
+    event.preventDefault();
   };
 
   const handleClick = () => {
