@@ -12,7 +12,28 @@ defmodule ExperimentHubWeb.TimelineController do
   alias ExperimentHub.Assignments.Assignment
   alias ExperimentHub.{Experiments, Repo}
 
-  @lifecycle_actions ~w(create start pause resume conclude)
+  # Audit action vocabulary the codebase actually writes: the API controller
+  # (ExperimentController) writes past-tense actions ("started", "paused",
+  # "resumed", "concluded"); Oban workers (ScheduledStartWorker,
+  # ExperimentScheduler, ScheduledEndWorker) write "scheduled_start" /
+  # "scheduled_end" for time-driven transitions. The present-tense forms
+  # ("start", "pause", ...) are also accepted for safety/back-compat (e.g.
+  # hand-seeded fixtures), then normalized below so the dashboard only ever
+  # sees one canonical spelling per lifecycle stage.
+  @normalized_action %{
+    "create" => "created",
+    "created" => "created",
+    "start" => "started",
+    "started" => "started",
+    "scheduled_start" => "started",
+    "pause" => "paused",
+    "paused" => "paused",
+    "resume" => "resumed",
+    "resumed" => "resumed",
+    "conclude" => "concluded",
+    "concluded" => "concluded",
+    "scheduled_end" => "concluded"
+  }
 
   @doc """
   GET /api/v1/experiments/:experiment_id/timeline
@@ -39,11 +60,11 @@ defmodule ExperimentHubWeb.TimelineController do
   defp lifecycle(experiment) do
     "experiment"
     |> AuditLog.list_for_resource(experiment.id, limit: 1000)
-    |> Enum.filter(&(&1.action in @lifecycle_actions))
+    |> Enum.filter(&Map.has_key?(@normalized_action, &1.action))
     |> Enum.sort_by(& &1.inserted_at, {:asc, DateTime})
     |> Enum.map(fn log ->
       %{
-        action: log.action,
+        action: Map.fetch!(@normalized_action, log.action),
         at: DateTime.to_iso8601(log.inserted_at),
         actor_type: log.actor_type,
         reason: log.reason

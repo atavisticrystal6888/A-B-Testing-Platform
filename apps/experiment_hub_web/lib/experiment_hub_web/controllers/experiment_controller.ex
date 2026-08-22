@@ -1,7 +1,7 @@
 defmodule ExperimentHubWeb.ExperimentController do
   use ExperimentHubWeb, :controller
 
-  alias ExperimentHub.Experiments
+  alias ExperimentHub.{AuditLog, Experiments}
   alias ExperimentHub.Metrics
 
   action_fallback ExperimentHubWeb.FallbackController
@@ -92,6 +92,8 @@ defmodule ExperimentHubWeb.ExperimentController do
       experiment ->
         case Experiments.start_experiment(experiment) do
           {:ok, updated} ->
+            log_lifecycle_event(conn, experiment, updated, "started")
+
             conn
             |> put_status(200)
             |> render(:transition, experiment: updated)
@@ -123,6 +125,8 @@ defmodule ExperimentHubWeb.ExperimentController do
       experiment ->
         case Experiments.pause_experiment(experiment) do
           {:ok, updated} ->
+            log_lifecycle_event(conn, experiment, updated, "paused")
+
             conn
             |> put_status(200)
             |> render(:transition, experiment: updated)
@@ -145,6 +149,8 @@ defmodule ExperimentHubWeb.ExperimentController do
       experiment ->
         case Experiments.resume_experiment(experiment) do
           {:ok, updated} ->
+            log_lifecycle_event(conn, experiment, updated, "resumed")
+
             conn
             |> put_status(200)
             |> render(:transition, experiment: updated)
@@ -174,6 +180,8 @@ defmodule ExperimentHubWeb.ExperimentController do
 
         case Experiments.conclude_experiment(experiment, attrs) do
           {:ok, updated} ->
+            log_conclusion(conn, experiment, updated, params)
+
             conn
             |> put_status(200)
             |> render(:transition, experiment: updated)
@@ -192,5 +200,58 @@ defmodule ExperimentHubWeb.ExperimentController do
         opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
       end)
     end)
+  end
+
+  # Writes the audit trail for API-driven lifecycle transitions. This is
+  # intentionally scoped to this controller rather than the shared
+  # `Experiments.start_experiment/1` etc. context functions: those are also
+  # called by Oban workers (ScheduledStartWorker, ExperimentScheduler,
+  # GuardrailWorker) and `demo_seeds.ex`, which already write their own
+  # differently-named audit entries ("scheduled_start", "guardrail_breach",
+  # the demo_seed rows) right after calling them — logging inside the shared
+  # functions too would double-log every one of those paths. `conclude`
+  # doesn't share this risk (its own path, `ConclusionService`, never calls
+  # `Experiments.conclude_experiment/2`), but it's logged the same way here
+  # for consistency.
+  defp log_lifecycle_event(conn, experiment, updated, action) do
+    AuditLog.log_experiment_change(
+      updated,
+      action,
+      actor_opts(conn) ++ [changes: %{status: %{from: experiment.status, to: updated.status}}]
+    )
+  end
+
+  defp log_conclusion(conn, experiment, updated, params) do
+    AuditLog.log_experiment_change(
+      updated,
+      "concluded",
+      actor_opts(conn) ++
+        [
+          reason: params["rationale"],
+          changes: %{
+            status: %{from: experiment.status, to: updated.status},
+            conclusion_decision: params["decision"],
+            winner_variant_id: params["winner_variant_id"]
+          }
+        ]
+    )
+  end
+
+  # Mirrors how other writers (ConclusionService, the Oban workers) populate
+  # actor_id/actor_type: a dashboard session user is "user", an API-key
+  # caller is "api_key" (a valid ExperimentHub.AuditLog actor_type),
+  # anything else (shouldn't happen behind :api_authenticated) falls back to
+  # "system".
+  defp actor_opts(conn) do
+    cond do
+      conn.assigns[:current_user_id] ->
+        [actor_id: conn.assigns.current_user_id, actor_type: "user"]
+
+      conn.assigns[:api_key] ->
+        [actor_id: conn.assigns.api_key.id, actor_type: "api_key"]
+
+      true ->
+        [actor_id: nil, actor_type: "system"]
+    end
   end
 end

@@ -3,6 +3,7 @@ defmodule ExperimentHubWeb.TimelineControllerTest do
 
   alias ExperimentHub.AuditLog
   alias ExperimentHub.Assignments.Assignment
+  alias ExperimentHub.Metrics
   alias ExperimentHub.Repo
 
   setup %{conn: conn} do
@@ -61,7 +62,10 @@ defmodule ExperimentHubWeb.TimelineControllerTest do
       })
       |> Repo.insert!()
 
-      {:ok, _log} = AuditLog.log_experiment_change(experiment, "start", actor_type: "user")
+      # "started" is the real action string production writers use (the API
+      # controller); see the "records API-driven lifecycle transitions" test
+      # below for coverage of that write path itself.
+      {:ok, _log} = AuditLog.log_experiment_change(experiment, "started", actor_type: "user")
 
       conn = get(conn, "/api/v1/experiments/#{experiment.id}/timeline")
       response = json_response(conn, 200)
@@ -69,7 +73,7 @@ defmodule ExperimentHubWeb.TimelineControllerTest do
       lifecycle = response["data"]["lifecycle"]
 
       assert Enum.any?(lifecycle, fn entry ->
-               entry["action"] == "start" and entry["actor_type"] == "user" and
+               entry["action"] == "started" and entry["actor_type"] == "user" and
                  entry["reason"] == nil
              end)
 
@@ -85,6 +89,67 @@ defmodule ExperimentHubWeb.TimelineControllerTest do
       conn = get(conn, "/api/v1/experiments/#{other_experiment.id}/timeline")
 
       assert json_response(conn, 404)["error"] == "not_found"
+    end
+
+    test "records API-driven lifecycle transitions and reflects them, normalized, in order", %{
+      conn: conn,
+      tenant: tenant
+    } do
+      experiment = experiment_fixture(tenant: tenant)
+
+      control =
+        variant_fixture(
+          experiment: experiment,
+          tenant: tenant,
+          is_control: true,
+          traffic_allocation: 5000
+        )
+
+      variant_fixture(
+        experiment: experiment,
+        tenant: tenant,
+        is_control: false,
+        traffic_allocation: 5000
+      )
+
+      {:ok, metric_definition} =
+        Metrics.create_metric_definition(%{
+          "tenant_id" => tenant.id,
+          "key" => "timeline-metric",
+          "name" => "Timeline Metric",
+          "metric_type" => "count",
+          "definition" => %{"event_name" => "signup"}
+        })
+
+      {:ok, _experiment_metric} =
+        Metrics.attach_metric(%{
+          "tenant_id" => tenant.id,
+          "experiment_id" => experiment.id,
+          "metric_definition_id" => metric_definition.id,
+          "role" => "primary"
+        })
+
+      assert json_response(post(conn, "/api/v1/experiments/#{experiment.id}/start"), 200)
+      assert json_response(post(conn, "/api/v1/experiments/#{experiment.id}/pause"), 200)
+      assert json_response(post(conn, "/api/v1/experiments/#{experiment.id}/resume"), 200)
+
+      assert json_response(
+               post(conn, "/api/v1/experiments/#{experiment.id}/conclude", %{
+                 "decision" => "ship_variant",
+                 "rationale" => "Treatment won.",
+                 "winner_variant_id" => control.id
+               }),
+               200
+             )
+
+      response = json_response(get(conn, "/api/v1/experiments/#{experiment.id}/timeline"), 200)
+
+      actions = Enum.map(response["data"]["lifecycle"], & &1["action"])
+      assert actions == ["started", "paused", "resumed", "concluded"]
+
+      concluded_entry = Enum.find(response["data"]["lifecycle"], &(&1["action"] == "concluded"))
+      assert concluded_entry["actor_type"] == "api_key"
+      assert concluded_entry["reason"] == "Treatment won."
     end
   end
 end

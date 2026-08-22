@@ -25,12 +25,16 @@ function useExperimentTimeline(id: string) {
   });
 }
 
+// Matches the normalized (past-tense) action vocabulary the timeline API
+// emits — see TimelineController's @normalized_action on the backend, which
+// collapses scheduler-written actions like "scheduled_start" into the same
+// canonical spelling before this page ever sees them.
 const ACTION_LABELS: Record<string, string> = {
-  create: "Created",
-  start: "Started",
-  pause: "Paused",
-  resume: "Resumed",
-  conclude: "Concluded",
+  created: "Created",
+  started: "Started",
+  paused: "Paused",
+  resumed: "Resumed",
+  concluded: "Concluded",
 };
 
 export default function ExperimentTimelinePage() {
