@@ -82,10 +82,17 @@ defmodule ExperimentHub.AuditLog do
 
   @doc """
   List audit logs for a resource.
+
+  `:actions` (optional, a list of action strings) filters **in the query**,
+  before `:limit` is applied — pass it whenever the caller only cares about
+  a subset of actions and the row it wants could otherwise be pushed out of
+  a busy resource's row cap by unrelated entries. Without it, behavior is
+  unchanged from before this option existed.
   """
   def list_for_resource(resource_type, resource_id, opts \\ []) do
     limit = opts[:limit] || 50
     offset = opts[:offset] || 0
+    actions = opts[:actions]
 
     from(a in __MODULE__,
       where: a.resource_type == ^resource_type and a.resource_id == ^resource_id,
@@ -93,6 +100,7 @@ defmodule ExperimentHub.AuditLog do
       limit: ^limit,
       offset: ^offset
     )
+    |> maybe_filter_actions(actions)
     |> Repo.all()
   end
 
@@ -110,5 +118,12 @@ defmodule ExperimentHub.AuditLog do
       offset: ^offset
     )
     |> Repo.all()
+  end
+
+  defp maybe_filter_actions(query, nil), do: query
+  defp maybe_filter_actions(query, []), do: query
+
+  defp maybe_filter_actions(query, actions) when is_list(actions) do
+    where(query, [a], a.action in ^actions)
   end
 end

@@ -64,8 +64,17 @@ defmodule ExperimentHubWeb.TimelineController do
   end
 
   defp lifecycle(experiment) do
+    # Filter to the lifecycle action vocabulary in the query itself, not
+    # after Repo.all/1 — otherwise the 1000-row cap below is spent on
+    # whatever mix of audit entries a busy experiment has accumulated
+    # (metric attach/detach, flag evaluations logged elsewhere, etc.), and a
+    # real lifecycle row can be silently pushed out before Enum.filter ever
+    # sees it.
     "experiment"
-    |> AuditLog.list_for_resource(experiment.id, limit: 1000)
+    |> AuditLog.list_for_resource(experiment.id,
+      limit: 1000,
+      actions: Map.keys(@normalized_action)
+    )
     |> Enum.filter(&Map.has_key?(@normalized_action, &1.action))
     |> Enum.sort_by(& &1.inserted_at, {:asc, DateTime})
     |> Enum.map(fn log ->
