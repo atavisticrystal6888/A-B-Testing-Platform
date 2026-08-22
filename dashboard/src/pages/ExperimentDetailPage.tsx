@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConcludeExperiment, useExperiment, useExperimentAction } from "../hooks/useExperiments";
@@ -13,6 +13,8 @@ import { SegmentBreakdownCard } from "../components/experiments/SegmentBreakdown
 import { DecisionPanel } from "../components/experiments/DecisionPanel";
 import { SrmWarningBanner } from "../components/experiments/SrmWarningBanner";
 import { LoadingState, ErrorState } from "../components/ui/QueryStates";
+import { InfoTip } from "../components/ui/InfoTip";
+import { GLOSSARY } from "../lib/statsGlossary";
 import type { AnalysisResults, ConclusionDecision, Experiment, MetricResult, ProjectionResult } from "../lib/types";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
@@ -170,6 +172,36 @@ function VariantTable({ experiment, results }: { experiment: Experiment; results
   );
 }
 
+/** Collapsible glossary of every stats term used on the results card (Roadmap #12). */
+function HowToReadThis() {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-200/50">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((prev) => !prev)}
+        className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+      >
+        How to read this {open ? "▲" : "▼"}
+      </button>
+      {open && (
+        <dl id={panelId} className="mt-3 space-y-2">
+          {(Object.keys(GLOSSARY) as Array<keyof typeof GLOSSARY>).map((key) => (
+            <div key={key}>
+              <dt className="text-xs font-semibold text-gray-700 capitalize">{GLOSSARY[key].term}</dt>
+              <dd className="text-xs text-gray-500">{GLOSSARY[key].definition}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
 function SignificanceCard({ metric }: { metric: MetricResult }) {
   const freq = metric.frequentist;
   if (!freq) return null;
@@ -188,11 +220,17 @@ function SignificanceCard({ metric }: { metric: MetricResult }) {
       </div>
       <div className="grid grid-cols-3 gap-4">
         <div>
-          <div className="text-xs text-gray-500">p-value</div>
+          <div className="flex items-center text-xs text-gray-500">
+            p-value
+            <InfoTip term="p_value" />
+          </div>
           <div className="text-lg font-semibold text-gray-900">{freq.p_value.toFixed(4)}</div>
         </div>
         <div>
-          <div className="text-xs text-gray-500">Power</div>
+          <div className="flex items-center text-xs text-gray-500">
+            Power
+            <InfoTip term="power" />
+          </div>
           <div className="text-lg font-semibold text-gray-900">{(freq.power_achieved * 100).toFixed(1)}%</div>
         </div>
         <div>
@@ -205,6 +243,7 @@ function SignificanceCard({ metric }: { metric: MetricResult }) {
           <p className="text-sm text-gray-600">{metric.recommendation.message}</p>
         </div>
       )}
+      <HowToReadThis />
     </div>
   );
 }
@@ -460,7 +499,10 @@ export default function ExperimentDetailPage() {
       {/* Guardrail Alerts */}
       {hasAnalysisResults && results?.guardrail_breaches && results.guardrail_breaches.length > 0 && (
         <div className="mt-6 bg-red-50 border border-red-200 rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-red-700 mb-2">Guardrail Breach</h3>
+          <h3 className="flex items-center text-sm font-semibold text-red-700 mb-2">
+            Guardrail Breach
+            <InfoTip term="guardrail" />
+          </h3>
           {results.guardrail_breaches.map((metric: string) => (
             <p key={metric} className="text-sm text-red-600">
               Metric "{metric}" has breached its guardrail threshold.
