@@ -62,7 +62,7 @@ describe('SegmentBreakdownCard — cohort chips', () => {
 
     fireEvent.click(screen.getByText('Country'));
 
-    expect(await screen.findByText(/no assignments recorded/i).catch(() => null)).toBeDefined();
+    expect(await screen.findByText(/no assignments recorded/i)).toBeInTheDocument();
     expect(api.get).toHaveBeenCalledWith(
       '/api/v1/experiments/exp-1/segments?attribute=country',
     );
