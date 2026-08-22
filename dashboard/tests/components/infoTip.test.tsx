@@ -76,4 +76,26 @@ describe("InfoTip", () => {
 
     expect(button.className).not.toContain("animate-pulse");
   });
+
+  it("stays open on mouseleave once pinned by a click", () => {
+    render(<InfoTip term="p_value" />);
+    const button = screen.getByRole("button", { name: "What is p-value?" });
+
+    fireEvent.click(button);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+
+    fireEvent.mouseLeave(button);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+  });
+
+  it("closes on mouseleave when only opened by hover", () => {
+    render(<InfoTip term="p_value" />);
+    const button = screen.getByRole("button", { name: "What is p-value?" });
+
+    fireEvent.mouseEnter(button);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+
+    fireEvent.mouseLeave(button);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
 });

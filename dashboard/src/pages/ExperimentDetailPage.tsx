@@ -218,7 +218,7 @@ function SignificanceCard({ metric }: { metric: MetricResult }) {
           {freq.is_significant ? "Significant" : "Not Significant"}
         </span>
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
           <div className="flex items-center text-xs text-gray-500">
             p-value
