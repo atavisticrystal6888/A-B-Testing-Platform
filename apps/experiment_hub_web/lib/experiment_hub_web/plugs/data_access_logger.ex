@@ -24,7 +24,15 @@ defmodule ExperimentHubWeb.Plugs.DataAccessLogger do
   end
 
   defp log_access(conn) do
-    actor_id = conn.assigns[:current_user_id] || conn.assigns[:api_key_id] || "anonymous"
+    # ApiKeyAuth assigns the whole struct as :api_key (plugs/api_key_auth.ex),
+    # not a bare :api_key_id — read the id off it so API-key requests are
+    # logged with the actual key id instead of always falling through to
+    # "anonymous".
+    actor_id =
+      conn.assigns[:current_user_id] ||
+        (conn.assigns[:api_key] && conn.assigns[:api_key].id) ||
+        "anonymous"
+
     tenant_id = conn.assigns[:tenant_id] || "unknown"
 
     metadata = %{
