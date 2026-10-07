@@ -39,7 +39,7 @@ disagree again.
 |---|---|
 | Path | `sdk/javascript/` (matches `docs/sdk/javascript-quickstart.md`) |
 | Name / version | `@experiment-hub/sdk` / `0.1.0` |
-| Runtime | Node ≥ 18 (native `fetch`, `AbortController`, `crypto.randomUUID`); also runs in modern browsers and edge runtimes, but the API key is a tenant secret and must stay server-side |
+| Runtime | Node ≥ 20 (native `fetch`, `AbortController`, and the unflagged `crypto` global — Node 18 only has it behind a flag and is end-of-life); also runs in modern browsers and edge runtimes, but the API key is a tenant secret and must stay server-side |
 | Build | `tsup` → `dist/index.js` (ESM), `dist/index.cjs` (CJS), `dist/index.d.ts` |
 | Language / tooling | TypeScript 5 strict, mirrors `dashboard/tsconfig.json` flags; ESLint 9 flat config; vitest 4 |
 | Runtime dependencies | **none** |
@@ -80,7 +80,10 @@ interface Assignment {
   isControl: boolean;
   /** false ⇒ experiment not running (draft/paused/concluded) or user not
    *  targeted; the server returned the control variant as a safe default and
-   *  recorded nothing. Treat as "show the baseline". */
+   *  recorded nothing. Treat as "show the baseline" — and do NOT track
+   *  events against it: the rollup buckets by the event's experiment/variant
+   *  ids with no assignment join, so un-enrolled users would be counted as
+   *  control and bias the result. */
   enrolled: boolean;
   assignedAt: string; // ISO 8601
 }
@@ -155,9 +158,14 @@ hub.flags.evaluate({ key, context? }) → { key: string; enabled: boolean }
 hub.flags.evaluateBatch({ keys, context? }) → Array<{ key; enabled }>
 ```
 
-Wire: `POST /api/v1/flags/evaluate` `{ key, context }` and
-`POST /api/v1/flags/evaluate/batch` `{ keys, context }`. `evaluate` throws
-`NotFoundError` on 404.
+Wire: `POST /api/v1/flags/evaluate` `{ key, context }` → `{ key, enabled }`,
+and `POST /api/v1/flags/evaluate/batch` `{ keys, context }` →
+`{ data: { [key]: boolean } }` (a map, per `FeatureFlags.evaluate_all/3`;
+keys the tenant does not have are simply absent). The SDK converts the map
+to `FlagEvaluation[]`, so a caller can detect a missing key by its absence.
+`evaluate` throws `NotFoundError` on 404; `evaluateBatch` never throws
+per-key. (Corrected 2026-10-07 by the final review — the first draft and
+the old API reference assumed an array.)
 
 **Server bug found by the contract test (in scope):** `ApiKeyAuth` does set
 `current_scope`, so auth is fine — but evaluating the seeded flag
