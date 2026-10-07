@@ -90,4 +90,20 @@ describe("transport.post", () => {
     expect(err).toBeInstanceOf(NetworkError);
     expect((err as NetworkError).code).toBe("aborted");
   });
+
+  it("times out reading the response body", async () => {
+    const fetch: typeof globalThis.fetch = async () => {
+      return new Response(
+        new ReadableStream({
+          start() {
+            // Never close the stream - body never completes
+          },
+        }),
+      );
+    };
+    const err = await transportWith(fetch, { timeoutMs: 100 }).post("/slow-body", {}).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NetworkError);
+    expect((err as NetworkError).code).toBe("timeout");
+    expect((err as NetworkError).message).toContain("100 ms");
+  });
 });

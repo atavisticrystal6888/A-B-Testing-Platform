@@ -55,35 +55,65 @@ export function createTransport(config: TransportConfig): Transport {
       if (options.signal?.aborted) forwardAbort();
       options.signal?.addEventListener("abort", forwardAbort, { once: true });
 
-      let response: Response;
       try {
-        response = await config.fetch(base + path, {
-          method: "POST",
-          headers: baseHeaders,
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-      } catch (cause) {
-        if (controller.signal.aborted && controller.signal.reason === TIMEOUT) {
-          throw new NetworkError(`POST ${path} timed out after ${config.timeoutMs} ms`, {
-            code: "timeout",
-            cause,
+        let response: Response;
+        try {
+          response = await config.fetch(base + path, {
+            method: "POST",
+            headers: baseHeaders,
+            body: JSON.stringify(body),
+            signal: controller.signal,
           });
+        } catch (cause) {
+          if (controller.signal.aborted && controller.signal.reason === TIMEOUT) {
+            throw new NetworkError(`POST ${path} timed out after ${config.timeoutMs} ms`, {
+              code: "timeout",
+              cause,
+            });
+          }
+          if (controller.signal.aborted) {
+            throw new NetworkError(`POST ${path} was aborted`, { code: "aborted", cause });
+          }
+          throw new NetworkError(`POST ${path} failed: ${describe(cause)}`, { cause });
         }
-        if (controller.signal.aborted) {
-          throw new NetworkError(`POST ${path} was aborted`, { code: "aborted", cause });
+
+        let parsed: unknown;
+        try {
+          const abortPromise = new Promise<never>((_, reject) => {
+            const handleAbort = () => {
+              if (controller.signal.reason === TIMEOUT) {
+                reject(new Error("timeout"));
+              } else {
+                reject(new Error("aborted"));
+              }
+            };
+            if (controller.signal.aborted) {
+              handleAbort();
+            }
+            controller.signal.addEventListener("abort", handleAbort, { once: true });
+          });
+          parsed = await Promise.race([parseBody(response), abortPromise]);
+        } catch (cause) {
+          if (controller.signal.aborted && controller.signal.reason === TIMEOUT) {
+            throw new NetworkError(`POST ${path} timed out after ${config.timeoutMs} ms`, {
+              code: "timeout",
+              cause,
+            });
+          }
+          if (controller.signal.aborted) {
+            throw new NetworkError(`POST ${path} was aborted`, { code: "aborted", cause });
+          }
+          throw new NetworkError(`POST ${path} failed: ${describe(cause)}`, { cause });
         }
-        throw new NetworkError(`POST ${path} failed: ${describe(cause)}`, { cause });
+
+        if (!response.ok) {
+          throw errorFromResponse("POST", path, response.status, response.headers, parsed);
+        }
+        return parsed as T;
       } finally {
         clearTimeout(timer);
         options.signal?.removeEventListener("abort", forwardAbort);
       }
-
-      const parsed = await parseBody(response);
-      if (!response.ok) {
-        throw errorFromResponse("POST", path, response.status, response.headers, parsed);
-      }
-      return parsed as T;
     },
   };
 }
