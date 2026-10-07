@@ -91,6 +91,17 @@ defmodule ExperimentHub.TargetingTest do
       rules = [%{"attribute" => "country", "operator" => "eq", "value" => "US"}]
       assert Targeting.evaluate(rules, %{}) == false
     end
+
+    test "accepts values as an alias of value" do
+      rules = [%{"attribute" => "country", "operator" => "in", "values" => ["US", "CA"]}]
+      assert Targeting.evaluate(rules, %{"country" => "US"}) == true
+      assert Targeting.evaluate(rules, %{"country" => "DE"}) == false
+    end
+
+    test "unrecognised rule shape evaluates to false without raising" do
+      assert Targeting.evaluate([%{"foo" => "bar"}], %{}) == false
+      assert Targeting.evaluate([%{"foo" => "bar"}], %{"country" => "US"}) == false
+    end
   end
 
   describe "validate_rules/1" do

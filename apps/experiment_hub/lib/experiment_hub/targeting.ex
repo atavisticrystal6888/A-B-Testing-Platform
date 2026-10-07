@@ -33,6 +33,14 @@ defmodule ExperimentHub.Targeting do
     !evaluate_rule(condition, user_attributes)
   end
 
+  # "values" is accepted as an alias of "value" (e.g. seeded `in` rules)
+  defp evaluate_rule(%{"attribute" => attr, "operator" => op, "values" => value}, user_attributes) do
+    evaluate_rule(%{"attribute" => attr, "operator" => op, "value" => value}, user_attributes)
+  end
+
+  # An unrecognised rule shape never matches rather than crashing evaluation
+  defp evaluate_rule(_rule, _user_attributes), do: false
+
   defp get_nested_attribute(attrs, key) when is_map(attrs) do
     keys = String.split(key, ".")
     get_in_path(attrs, keys)
