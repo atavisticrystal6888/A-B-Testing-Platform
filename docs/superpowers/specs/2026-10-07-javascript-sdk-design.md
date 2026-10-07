@@ -105,8 +105,10 @@ hub.trackBatch(events: TrackInput[]) → BatchEventReceipt
 
 interface TrackInput {
   userId: string;
+  experimentId: string;         // UUID from Assignment.experimentId
+  variantId: string;            // UUID from Assignment.variantId
   type: "conversion" | "metric" | "revenue";
-  name: string;                 // metric event_name, e.g. "checkout_conversion"
+  name: string;                 // metric event_name, e.g. "checkout_completed"
   value?: number;               // required by the server for metric/revenue
   timestamp?: string | Date;    // default: now
   idempotencyKey?: string;      // default: crypto.randomUUID()
@@ -114,16 +116,24 @@ interface TrackInput {
 }
 ```
 
-Wire: `POST /v1/events` `{ user_id, event_type, event_name, value, timestamp,
-idempotency_key, properties }`; batch `POST /v1/events/batch` `{ events: [...] }`.
+Wire: `POST /v1/events` `{ user_id, experiment_id, variant_id, event_type,
+event_name, value, timestamp, idempotency_key, properties }`; batch
+`POST /v1/events/batch` `{ events: [...] }`.
 
-Events carry **no experiment or variant field**: the pipeline joins events to
-assignments by `user_id`. The SDK's types make that impossible to get wrong.
+Events carry the **experiment and variant UUIDs** returned by `assign`. The
+server rejects an event without a UUID `experiment_id`
+(`event_validator.ex:17,25`), and the rollup pipeline buckets events by the
+`experiment_id` and `variant_id` on the event itself
+(`data_pipeline/src/aggregators/daily_rollup.py:76-77`) — it does not join
+to assignments by user. The SDK therefore requires both, so an event can never
+be recorded in a way the analysis cannot attribute. (Corrected 2026-10-07 by
+the contract suite; the original draft claimed a `user_id` join.)
 
 Client-side pre-validation (throws `ValidationError` before any network call,
-so the failure is attributable to the caller, not the server): `userId` and
-`name` non-empty, `type` in the allowed set, `value` present for
-`metric`/`revenue`, batch length 1–1000. Nothing else is validated locally;
+so the failure is attributable to the caller, not the server): `userId`,
+`experimentId`, `variantId` and `name` non-empty, `type` in the allowed set,
+`value` present for `metric`/`revenue`, batch length 1–1000. UUID format is
+left to the server. Nothing else is validated locally;
 the server remains the source of truth and its 400 body is surfaced verbatim.
 
 ```ts
@@ -149,12 +159,14 @@ Wire: `POST /api/v1/flags/evaluate` `{ key, context }` and
 `POST /api/v1/flags/evaluate/batch` `{ keys, context }`. `evaluate` throws
 `NotFoundError` on 404.
 
-**Risk to verify in the contract test:** the controller reads
-`conn.assigns[:current_scope].tenant_id`. If `ApiKeyAuth` does not populate
-`current_scope`, API-key callers get a 500. The contract test exercises this
-path; if it fails, the fix is a one-line server change in
-`feature_flag_controller.ex` (read `conn.assigns.tenant_id`, as the assign and
-event controllers do) and is in scope for this sub-project.
+**Server bug found by the contract test (in scope):** `ApiKeyAuth` does set
+`current_scope`, so auth is fine — but evaluating the seeded flag
+`checkout_reassurance` returned 500 because its targeting rule is stored as
+`{"attribute","operator","values"}` while `ExperimentHub.Targeting.evaluate_rule/2`
+only matches `"value"`, and there is no fallback clause, so a malformed rule
+raises `FunctionClauseError`. Fix: accept `"values"` as an alias of `"value"`
+and add a catch-all clause that treats an unrecognised rule as not matching.
+A flag evaluation must never 500 on rule shape.
 
 ### 5.4 Errors
 
@@ -263,8 +275,10 @@ the `release-smoke-test` job is the natural future home.
 
 - **`context` vs `attributes`:** the server reads `params["attributes"]`
   (`assignments.ex:26`). SDK uses `attributes`; docs were wrong.
-- **Where does the event say which experiment it belongs to?** It doesn't;
-  the join is on `user_id`. `TrackInput` deliberately has no such field.
+- **Where does the event say which experiment it belongs to?** On the event:
+  `experiment_id` (required by the server, UUID) and `variant_id` (what the
+  rollup buckets by). Both come from the `assign` response. The first draft of
+  this spec claimed a `user_id` join; the contract suite proved otherwise.
 - **Do non-running experiments error?** No — control + `enrolled:false`
   (`assignments.ex:185-200`). Surfaced as a typed boolean, documented inline.
 - **tsup vs plain tsc:** tsup, for dual ESM/CJS output without two tsconfigs.

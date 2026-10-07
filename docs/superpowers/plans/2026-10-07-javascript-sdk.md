@@ -15,7 +15,8 @@
 - Package path `sdk/javascript/`, name `@experiment-hub/sdk`, version `0.1.0`, `"private": false`, not published.
 - **Zero runtime dependencies.** Everything is a devDependency.
 - Node ≥ 18 (`"engines": {"node": ">=18"}`); CI uses Node 24.
-- Wire format is snake_case; public API is camelCase. Assignment attributes are sent as `attributes` (NOT `context`). Events carry NO experiment/variant field.
+- Wire format is snake_case; public API is camelCase. Assignment attributes are sent as `attributes` (NOT `context`). Events carry `experiment_id` (required, UUID) and `variant_id` (UUID), both taken from the assign response — the rollup pipeline buckets by them.
+- **Amended 2026-10-07 during execution:** the first live contract run showed events need `experiment_id`/`variant_id`; the Task 5 and Task 8 code blocks below predate that and are superseded by spec §5.2 and `.superpowers/sdd/2026-10-07-javascript-sdk/task-8-addendum.md` (Rulings 5–7). Task 8 also fixed a server crash in `ExperimentHub.Targeting` (Ruling 6).
 - Default timeout 2000 ms. No retries. No fail-open inside the SDK (`assign` throws on outage).
 - Auth header is `X-API-Key`. Runtime routes: `POST /v1/assign`, `POST /v1/assign/batch`, `POST /v1/events`, `POST /v1/events/batch`, `POST /api/v1/flags/evaluate`, `POST /api/v1/flags/evaluate/batch`.
 - Server responses: assign 200; events 202 (`status:"accepted"`), batch events 202/207/400 with `status` `"accepted"|"partial"|"rejected"`; 400 `{error:"validation_error",message,details:[{field,error}]}`; 401 `{error:"unauthorized",message}`; 404 `{error:"experiment_not_found"|"not_found",message?}`; 429 with `Retry-After` + `x-ratelimit-limit/remaining/reset`; 503 `{error:"service_unavailable",message}`.
@@ -2133,9 +2134,9 @@ const hub = createClient({
 const a = await hub.assign({ userId: user.id, experimentKey: "checkout-copy-demo" });
 if (a.enrolled && a.variantKey === "treatment") renderNewCopy(); else renderCurrentCopy();
 
-// 2. What did they do? (joined to the assignment by userId — no experiment field needed)
-await hub.track({ userId: user.id, type: "conversion", name: "checkout_completed" });
-await hub.track({ userId: user.id, type: "revenue", name: "order_completed", value: 1299 });
+// 2. What did they do? (experiment and variant UUIDs come from the assignment)
+await hub.track({ userId: user.id, experimentId: a.experimentId, variantId: a.variantId, type: "conversion", name: "checkout_completed" });
+await hub.track({ userId: user.id, experimentId: a.experimentId, variantId: a.variantId, type: "revenue", name: "order_completed", value: 1299 });
 
 // Flags
 const { enabled } = await hub.flags.evaluate({ key: "checkout_reassurance", context: { user_id: user.id } });
@@ -2192,13 +2193,13 @@ against the SDK and server drifting apart. Start the stack with the
 `mix dev.demo`, `mix phx.server`), then export the key `mix dev.demo` prints.
 ````
 
-- [ ] **Step 2: Rewrite `docs/sdk/javascript-quickstart.md`** so that every snippet compiles against the real package. Keep the headings (Installation, Configuration, Get a Variant Assignment, Track Events, Batch Events, Feature Flags) and replace the contents: install from the monorepo path (no npm publish yet); `createClient` with `baseUrl`/`apiKey` (no `tenantId` — the key identifies the tenant); `assign` takes `attributes` not `context` and returns `variantKey`/`enrolled`; `track` takes `{ userId, type, name, value? }` with no experiment/variant field; remove the React Hook section and replace with one sentence: "A React package is not shipped; with server-side assignment the variant is a prop." Link to `sdk/javascript/README.md` for errors and fail-open.
+- [ ] **Step 2: Rewrite `docs/sdk/javascript-quickstart.md`** so that every snippet compiles against the real package. Keep the headings (Installation, Configuration, Get a Variant Assignment, Track Events, Batch Events, Feature Flags) and replace the contents: install from the monorepo path (no npm publish yet); `createClient` with `baseUrl`/`apiKey` (no `tenantId` — the key identifies the tenant); `assign` takes `attributes` not `context` and returns `variantKey`/`enrolled`; `track` takes `{ userId, experimentId, variantId, type, name, value? }` using the UUIDs from the assignment; remove the React Hook section and replace with one sentence: "A React package is not shipped; with server-side assignment the variant is a prop." Link to `sdk/javascript/README.md` for errors and fail-open.
 
 - [ ] **Step 3: Fix `docs/api-reference.md`** — the runtime sections must match `apps/experiment_hub_web/lib/experiment_hub_web/router.ex:104-112` and `:115-124`:
 
   - "Experiments": `POST /experiments/:id/launch` → `POST /api/v1/experiments/:id/start`; add the `/api/v1` prefix to every management route in the section if it is missing.
   - "Assignments": `POST /assignments` → `POST /v1/assign` with body `{ "user_id", "experiment_key", "attributes" }` and the real response fields (`experiment_key, variant_key, variant_name, experiment_id, variant_id, is_control, enrolled, assigned_at`); add `POST /v1/assign/batch` `{ "user_id", "experiment_keys", "attributes" }` → `{ user_id, assignments: [...], assigned_at }`.
-  - "Events": `POST /v1/events` body `{ user_id, event_type, event_name, timestamp, idempotency_key, value?, properties? }` → `202 { status, event_id, received_at }`; `POST /v1/events/batch` `{ events: [...] }` → 202/207/400 `{ status: accepted|partial|rejected, accepted, rejected, errors }`. State explicitly that events carry no experiment field.
+  - "Events": `POST /v1/events` body `{ user_id, event_type, event_name, timestamp, idempotency_key, value?, properties? }` → `202 { status, event_id, received_at }`; `POST /v1/events/batch` `{ events: [...] }` → 202/207/400 `{ status: accepted|partial|rejected, accepted, rejected, errors }`. State explicitly that events require a UUID `experiment_id` and should carry `variant_id` (the rollup buckets by both).
   - "Feature Flags": `GET /flags/:flag_key` → `POST /api/v1/flags/evaluate` `{ key, context }` → `{ key, enabled }`; add `POST /api/v1/flags/evaluate/batch` `{ keys, context }` → `{ data: [...] }`.
   - Authentication: state `X-API-Key: <key>` for runtime routes and `Authorization: Bearer <jwt>` for the dashboard/management routes.
 
