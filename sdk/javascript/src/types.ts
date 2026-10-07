@@ -85,7 +85,11 @@ export type EventType = "conversion" | "metric" | "revenue";
 
 export interface TrackInput {
   userId: string;
-  /** UUID from `Assignment.experimentId`. The server rejects events without it. */
+  /**
+   * UUID from `Assignment.experimentId`. The server rejects events without it.
+   * Only track for assignments with `enrolled: true`: the rollup buckets by this id with no assignment
+   * join, so events from un-enrolled users would be counted as control.
+   */
   experimentId: string;
   /** UUID from `Assignment.variantId`. The rollup pipeline buckets by it. */
   variantId: string;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createAssignMethods } from "../src/assign";
-import { NotFoundError } from "../src/errors";
+import { NetworkError, NotFoundError } from "../src/errors";
 import { createTransport } from "../src/transport";
 import { fakeFetch } from "./helpers/fake-fetch";
 
@@ -69,11 +69,14 @@ describe("assign", () => {
     await expect(methods.assign({ userId: "u1", experimentKey: "nope" })).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("forwards the abort signal", async () => {
-    const { methods, requests } = setup({ status: 200, body: wireAssignment });
+  it("aborts a request in flight when the caller signal fires", async () => {
+    const { methods } = setup({ delayMs: 500, status: 200, body: wireAssignment });
     const controller = new AbortController();
-    await methods.assign({ userId: "u1", experimentKey: "x" }, { signal: controller.signal });
-    expect(requests[0].signal).toBeDefined();
+    const pending = methods.assign({ userId: "u1", experimentKey: "x" }, { signal: controller.signal });
+    setTimeout(() => controller.abort(), 20);
+    const err = await pending.catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NetworkError);
+    expect((err as NetworkError).code).toBe("aborted");
   });
 });
 

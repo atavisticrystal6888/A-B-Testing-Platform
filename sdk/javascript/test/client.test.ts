@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createClient } from "../src/client";
-import { ValidationError } from "../src/errors";
+import { DEFAULT_TIMEOUT_MS, createClient } from "../src/client";
+import { NetworkError, ValidationError } from "../src/errors";
 import { fakeFetch } from "./helpers/fake-fetch";
 
 describe("createClient", () => {
@@ -9,7 +9,21 @@ describe("createClient", () => {
     expect(() => createClient({ baseUrl: "http://hub.test", apiKey: "" })).toThrow(ValidationError);
   });
 
-  it("uses the injected fetch and default timeout of 2000 ms", async () => {
+  it("applies timeoutMs, and defaults it to 2000 ms", async () => {
+    expect(DEFAULT_TIMEOUT_MS).toBe(2000);
+
+    const slow = fakeFetch({ delayMs: 50 });
+    const hubSlow = createClient({ baseUrl: "http://hub.test", apiKey: "k", fetch: slow.fetch, timeoutMs: 10 });
+    const err = await hubSlow.flags.evaluate({ key: "k" }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NetworkError);
+    expect((err as NetworkError).code).toBe("timeout");
+
+    const quick = fakeFetch({ status: 200, body: { key: "k", enabled: true } });
+    const hubDefault = createClient({ baseUrl: "http://hub.test", apiKey: "k", fetch: quick.fetch });
+    await expect(hubDefault.flags.evaluate({ key: "k" })).resolves.toEqual({ key: "k", enabled: true });
+  });
+
+  it("uses the injected fetch and normalises the base URL", async () => {
     const { fetch, requests } = fakeFetch({ status: 200, body: { key: "k", enabled: true } });
     const hub = createClient({ baseUrl: "http://hub.test/", apiKey: "eh_live_x", fetch });
     await hub.flags.evaluate({ key: "k" });

@@ -5,7 +5,7 @@ import { createFlagMethods } from "./flags";
 import { createTransport } from "./transport";
 import type { ClientConfig, ExperimentHubClient } from "./types";
 
-const DEFAULT_TIMEOUT_MS = 2000;
+export const DEFAULT_TIMEOUT_MS = 2000;
 
 /**
  * Create an ExperimentHub client. Pure: no global state, safe to call many

@@ -19,4 +19,18 @@ describe("public entry point", () => {
       expect(typeof sdk[name]).toBe("function");
     }
   });
+
+  it("isBatchAssignmentError distinguishes per-item errors from assignments", () => {
+    expect(sdk.isBatchAssignmentError({ experimentKey: "x", error: "experiment_not_found" })).toBe(true);
+    expect(
+      sdk.isBatchAssignmentError({
+        experimentKey: "x",
+        experimentId: "e1",
+        variantKey: "control",
+        variantId: "v1",
+        isControl: true,
+        enrolled: true,
+      }),
+    ).toBe(false);
+  });
 });
