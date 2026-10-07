@@ -88,3 +88,6 @@ graphify-out/
 
 # Agent scratch: plan ledgers and fix reports, not project history
 .superpowers/
+
+# Claude Code worktrees (agent isolation)
+.claude/worktrees/
