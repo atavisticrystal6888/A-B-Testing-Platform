@@ -23,7 +23,7 @@ const userId = () => `sdk-contract-${crypto.randomUUID()}`;
 describe.skipIf(!enabled)("live contract against ExperimentHub", () => {
   // vitest still runs this callback when skipped, and createClient rejects an empty baseUrl.
   // The `unset` fallbacks are never used for a request: the tests below only run when both env vars are set.
-  const hub = createClient({ baseUrl: BASE_URL ?? "http://unset.invalid", apiKey: API_KEY ?? "unset" });
+  const hub = createClient({ baseUrl: BASE_URL ?? "http://unset.invalid", apiKey: API_KEY ?? "unset", timeoutMs: 10_000 });
 
   it("assigns a running experiment and is sticky per user", async () => {
     const uid = userId();
@@ -105,12 +105,19 @@ describe.skipIf(!enabled)("live contract against ExperimentHub", () => {
     expect(typeof result.enabled).toBe("boolean");
   });
 
+  it("evaluateBatch returns only the known keys", async () => {
+    const result = await hub.flags.evaluateBatch({ keys: [FLAG, "no-such-flag"], context: { user_id: userId() } });
+    expect(result).toHaveLength(1);
+    expect(result[0].key).toBe(FLAG);
+    expect(typeof result[0].enabled).toBe("boolean");
+  });
+
   it("throws NotFoundError for an unknown flag", async () => {
     await expect(hub.flags.evaluate({ key: "no-such-flag" })).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("rejects a wrong API key with AuthenticationError", async () => {
-    const bad = createClient({ baseUrl: BASE_URL ?? "http://unset.invalid", apiKey: "eh_live_definitely_wrong" });
+    const bad = createClient({ baseUrl: BASE_URL ?? "http://unset.invalid", apiKey: "eh_live_definitely_wrong", timeoutMs: 10_000 });
     await expect(bad.assign({ userId: userId(), experimentKey: RUNNING })).rejects.toBeInstanceOf(
       AuthenticationError,
     );
