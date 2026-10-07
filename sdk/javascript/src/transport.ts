@@ -49,6 +49,8 @@ export function createTransport(config: TransportConfig): Transport {
 
   return {
     async post<T>(path: string, body: unknown, options: RequestOptions = {}): Promise<T> {
+      // Serialise first: a bad body is a caller bug and must surface as-is, not as a NetworkError.
+      const payload = JSON.stringify(body);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(TIMEOUT), config.timeoutMs);
       const forwardAbort = () => controller.abort(options.signal?.reason);
@@ -61,7 +63,7 @@ export function createTransport(config: TransportConfig): Transport {
           response = await config.fetch(base + path, {
             method: "POST",
             headers: baseHeaders,
-            body: JSON.stringify(body),
+            body: payload,
             signal: controller.signal,
           });
         } catch (cause) {

@@ -115,4 +115,18 @@ describe("errorFromResponse", () => {
     const err = errorFromResponse("POST", "/v1/assign", 400, h(), { error: "validation_error" });
     expect(err.message).toBe("POST /v1/assign failed with 400");
   });
+
+  it("uses the batch `errors` array as details when the body has no details", () => {
+    const errors = [
+      { index: 0, error: "validation_error", details: [{ field: "timestamp", error: "must be a valid ISO 8601 timestamp" }] },
+    ];
+    const err = errorFromResponse("POST", "/v1/events/batch", 400, h(), {
+      status: "rejected",
+      accepted: 0,
+      rejected: 1,
+      errors,
+    });
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.details).toEqual(errors);
+  });
 });

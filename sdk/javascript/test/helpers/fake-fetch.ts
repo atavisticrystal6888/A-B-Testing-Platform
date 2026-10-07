@@ -14,6 +14,11 @@ export interface ScriptedResponse {
   body?: unknown;
   /** Resolve only after this many ms (aborts early if the signal fires). */
   delayMs?: number;
+  /**
+   * Headers resolve immediately; the body stream only delivers after this many ms
+   * (and errors with the signal's reason if the signal fires first).
+   */
+  bodyDelayMs?: number;
 }
 
 /**
@@ -58,6 +63,30 @@ export function fakeFetch(...script: ScriptedResponse[]) {
         : typeof planned.body === "string"
           ? planned.body
           : JSON.stringify(planned.body);
+    if (planned.bodyDelayMs) {
+      const encoded = new TextEncoder().encode(body);
+      const delay = planned.bodyDelayMs;
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const timer = setTimeout(() => {
+            controller.enqueue(encoded);
+            controller.close();
+          }, delay);
+          init?.signal?.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              controller.error(init.signal?.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+            },
+            { once: true },
+          );
+        },
+      });
+      return new Response(stream, {
+        status: planned.status ?? 200,
+        headers: { "content-type": "application/json", ...planned.headers },
+      });
+    }
     return new Response(body, {
       status: planned.status ?? 200,
       headers: { "content-type": "application/json", ...planned.headers },

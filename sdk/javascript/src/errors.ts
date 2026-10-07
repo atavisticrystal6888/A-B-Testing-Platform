@@ -91,6 +91,7 @@ interface ErrorBody {
   error?: unknown;
   message?: unknown;
   details?: unknown;
+  errors?: unknown;
 }
 
 function asErrorBody(body: unknown): ErrorBody {
@@ -120,7 +121,9 @@ export function errorFromResponse(
   // Only override the subclass default code when the server actually sent one:
   // spreading `{ code: undefined }` would clobber the default.
   const serverCode = typeof parsed.error === "string" ? parsed.error : undefined;
-  const common: ErrorOptions = serverCode ? { code: serverCode, details: parsed.details } : { details: parsed.details };
+  // Batch rejections carry per-item failures in `errors` rather than `details`.
+  const details = parsed.details ?? (Array.isArray(parsed.errors) ? parsed.errors : undefined);
+  const common: ErrorOptions = serverCode ? { code: serverCode, details } : { details };
 
   switch (status) {
     case 400:

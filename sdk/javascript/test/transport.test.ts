@@ -106,4 +106,33 @@ describe("transport.post", () => {
     expect((err as NetworkError).code).toBe("timeout");
     expect((err as NetworkError).message).toContain("100 ms");
   });
+
+  it("propagates a serialisation TypeError unchanged (not NetworkError)", async () => {
+    const { fetch, requests } = fakeFetch();
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const err = await transportWith(fetch).post("/a", circular).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(TypeError);
+    expect(err).not.toBeInstanceOf(NetworkError);
+    expect(requests).toHaveLength(0);
+  });
+
+  it("maps an already-aborted caller signal to NetworkError{code:'aborted'}", async () => {
+    const { fetch } = fakeFetch({ delayMs: 200 });
+    const controller = new AbortController();
+    controller.abort();
+    const err = await transportWith(fetch).post("/a", {}, { signal: controller.signal }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NetworkError);
+    expect((err as NetworkError).code).toBe("aborted");
+  });
+
+  it("maps a caller abort during the body read to NetworkError{code:'aborted'}", async () => {
+    const { fetch } = fakeFetch({ bodyDelayMs: 500, body: { ok: true } });
+    const controller = new AbortController();
+    const pending = transportWith(fetch).post("/slow-body", {}, { signal: controller.signal });
+    setTimeout(() => controller.abort(), 30);
+    const err = await pending.catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NetworkError);
+    expect((err as NetworkError).code).toBe("aborted");
+  });
 });

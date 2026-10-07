@@ -131,11 +131,15 @@ describe("trackBatch", () => {
     expect((err as ValidationError).message).toContain("events[1]");
   });
 
-  it("throws ValidationError when the server rejects every event (400)", async () => {
-    const { methods } = setup({
-      status: 400,
-      body: { status: "rejected", accepted: 0, rejected: 1, errors: [{ index: 0, error: "validation_error", details: [] }] },
-    });
-    await expect(methods.trackBatch([{ userId: "u", experimentId: "exp-1", variantId: "var-1", type: "conversion", name: "x" }])).rejects.toBeInstanceOf(ValidationError);
+  it("throws ValidationError carrying the per-event errors when the server rejects every event (400)", async () => {
+    const errors = [
+      { index: 0, error: "validation_error", details: [{ field: "timestamp", error: "must be a valid ISO 8601 timestamp" }] },
+    ];
+    const { methods } = setup({ status: 400, body: { status: "rejected", accepted: 0, rejected: 1, errors } });
+    const err = await methods
+      .trackBatch([{ userId: "u", experimentId: "exp-1", variantId: "var-1", type: "conversion", name: "x" }])
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect((err as ValidationError).details).toEqual(errors);
   });
 });
