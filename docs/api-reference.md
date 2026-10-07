@@ -12,6 +12,9 @@ Authentication depends on the route family:
 ## Authentication
 
 ### POST /auth/register
+
+> Not exposed by the current router.
+
 Create a new user account.
 
 **Request Body:**
@@ -31,7 +34,7 @@ Create a new user account.
 { "token": "eyJhbGciOi..." }
 ```
 
-### POST /auth/login
+### POST /api/v1/auth/login
 Authenticate and receive a JWT token.
 
 **Request Body:**
@@ -248,7 +251,7 @@ identifies the failed event by its index.
 
 ## Results
 
-### GET /experiments/:id/results
+### GET /api/v1/experiments/:id/results
 Get statistical analysis results.
 
 **Response:** `200 OK`
@@ -308,25 +311,25 @@ Evaluate several flags with one context.
 { "keys": ["checkout_reassurance", "dark-mode"], "context": { "user_id": "user-123" } }
 ```
 
-**Response:** `200 OK`
+**Response:** `200 OK` (a map of flag key to boolean; keys the server does not know are absent, not 404)
 ```json
-{ "data": [ { "key": "checkout_reassurance", "enabled": true }, { "key": "dark-mode", "enabled": false } ] }
+{ "data": { "checkout_reassurance": true, "dark-mode": false } }
 ```
 
-### GET /feature-flags
+### GET /api/v1/flags
 List all feature flags.
 
-### POST /feature-flags
+### POST /api/v1/flags
 Create a feature flag.
 
-### PUT /feature-flags/:id
+### PUT /api/v1/flags/:id
 Update a feature flag.
 
 ---
 
 ## GDPR
 
-### POST /gdpr/anonymize
+### POST /api/v1/gdpr/anonymize
 Request user data anonymization.
 
 **Request Body:**
@@ -336,7 +339,7 @@ Request user data anonymization.
 
 **Response:** `202 Accepted`
 
-### GET /gdpr/export
+### GET /api/v1/gdpr/export
 Export user data (right of access).
 
 **Query Parameters:**

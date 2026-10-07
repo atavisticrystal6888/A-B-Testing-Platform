@@ -44,34 +44,48 @@ if (assignment.enrolled && assignment.variantKey === "reassurance-copy") {
 ```
 
 `enrolled: false` means the experiment is not running or the user is not
-targeted; the server returns the control variant and records nothing.
+targeted; the server returns the control variant and records nothing. Only
+track events for assignments with `enrolled: true`: the results rollup buckets
+by the event's experiment and variant ids with no assignment join, so tracking
+an un-enrolled user counts them as control and biases the result.
 
 ### Track Events
 
-Events carry the experiment and variant UUIDs from the assignment.
+Events carry the experiment and variant UUIDs from the assignment. Guard with
+`assignment.enrolled`; tracking an un-enrolled user counts them as control.
 
 ```typescript
-await hub.track({
-  userId: user.id,
-  experimentId: assignment.experimentId,
-  variantId: assignment.variantId,
-  type: "conversion",
-  name: "checkout_completed",
-});
+if (assignment.enrolled) {
+  await hub.track({
+    userId: user.id,
+    experimentId: assignment.experimentId,
+    variantId: assignment.variantId,
+    type: "conversion",
+    name: "checkout_completed",
+  });
 
-await hub.track({
-  userId: user.id,
-  experimentId: assignment.experimentId,
-  variantId: assignment.variantId,
-  type: "revenue",
-  name: "order_completed",
-  value: 1299,
-});
+  await hub.track({
+    userId: user.id,
+    experimentId: assignment.experimentId,
+    variantId: assignment.variantId,
+    type: "revenue",
+    name: "order_completed",
+    value: 1299,
+  });
+}
 ```
 
 ### Batch Events
 
 ```typescript
+// Take the ids from enrolled assignments (here: one experiment, two users).
+const a1 = await hub.assign({ userId: "u1", experimentKey: "checkout-copy-demo" });
+const a2 = await hub.assign({ userId: "u2", experimentKey: "checkout-copy-demo" });
+const { experimentId } = a1;
+const controlId = a1.variantId;
+const treatmentId = a2.variantId;
+
+// Only enrolled users are tracked; filter before building the batch.
 const receipt = await hub.trackBatch([
   { userId: "u1", experimentId, variantId: controlId, type: "conversion", name: "checkout_completed" },
   { userId: "u2", experimentId, variantId: treatmentId, type: "revenue", name: "order_completed", value: 49.99 },

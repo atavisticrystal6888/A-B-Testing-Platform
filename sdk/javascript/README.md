@@ -1,7 +1,7 @@
 # @experiment-hub/sdk
 
 TypeScript client for the ExperimentHub runtime API: variant assignment,
-event tracking, and feature flags. Zero runtime dependencies; Node ≥ 18.
+event tracking, and feature flags. Zero runtime dependencies; Node ≥ 20.
 
 > The API key is a **tenant secret**. Use this SDK server-side (Node, Next.js
 > route handlers / server components, edge functions). Never ship the key to a
@@ -30,9 +30,12 @@ const hub = createClient({
 const a = await hub.assign({ userId: user.id, experimentKey: "checkout-copy-demo" });
 if (a.enrolled && a.variantKey === "reassurance-copy") renderNewCopy(); else renderCurrentCopy();
 
-// 2. What did they do? (experiment and variant UUIDs come from the assignment)
-await hub.track({ userId: user.id, experimentId: a.experimentId, variantId: a.variantId, type: "conversion", name: "checkout_completed" });
-await hub.track({ userId: user.id, experimentId: a.experimentId, variantId: a.variantId, type: "revenue", name: "order_completed", value: 1299 });
+// 2. What did they do? (experiment and variant UUIDs come from the assignment;
+//    only track when enrolled, see "enrolled: false" below)
+if (a.enrolled) {
+  await hub.track({ userId: user.id, experimentId: a.experimentId, variantId: a.variantId, type: "conversion", name: "checkout_completed" });
+  await hub.track({ userId: user.id, experimentId: a.experimentId, variantId: a.variantId, type: "revenue", name: "order_completed", value: 1299 });
+}
 
 // Flags
 const { enabled } = await hub.flags.evaluate({ key: "checkout_reassurance", context: { user_id: user.id } });
@@ -43,6 +46,9 @@ const { enabled } = await hub.flags.evaluate({ key: "checkout_reassurance", cont
 When an experiment is not running (draft / paused / concluded) or the user is
 not targeted, the server returns the **control** variant with
 `enrolled: false` and records nothing. Treat it as "show the baseline".
+Only track events for assignments with `enrolled: true`: the results rollup
+buckets by the event's experiment and variant ids with no assignment join, so
+tracking an un-enrolled user counts them as control and biases the result.
 
 ### Errors
 
