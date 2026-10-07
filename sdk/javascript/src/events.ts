@@ -4,6 +4,8 @@ import type { BatchEventReceipt, EventReceipt, EventType, RequestOptions, TrackI
 
 export interface WireEvent {
   user_id: string;
+  experiment_id: string;
+  variant_id: string;
   event_type: EventType;
   event_name: string;
   timestamp: string;
@@ -34,6 +36,8 @@ export function toWireEvent(input: TrackInput, index?: number): WireEvent {
   const where = index === undefined ? "event" : `events[${index}]`;
 
   if (typeof input.userId !== "string" || input.userId.length === 0) fail(where, "user_id", "is required");
+  if (typeof input.experimentId !== "string" || input.experimentId.length === 0) fail(where, "experiment_id", "is required");
+  if (typeof input.variantId !== "string" || input.variantId.length === 0) fail(where, "variant_id", "is required");
   if (typeof input.name !== "string" || input.name.length === 0) fail(where, "event_name", "is required");
   if (!EVENT_TYPES.has(input.type)) fail(where, "event_type", "must be one of: conversion, metric, revenue");
   if ((input.type === "metric" || input.type === "revenue") && typeof input.value !== "number") {
@@ -49,6 +53,8 @@ export function toWireEvent(input: TrackInput, index?: number): WireEvent {
 
   const wire: WireEvent = {
     user_id: input.userId,
+    experiment_id: input.experimentId,
+    variant_id: input.variantId,
     event_type: input.type,
     event_name: input.name,
     timestamp,

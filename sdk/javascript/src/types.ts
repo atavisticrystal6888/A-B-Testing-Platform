@@ -85,6 +85,10 @@ export type EventType = "conversion" | "metric" | "revenue";
 
 export interface TrackInput {
   userId: string;
+  /** UUID from `Assignment.experimentId`. The server rejects events without it. */
+  experimentId: string;
+  /** UUID from `Assignment.variantId`. The rollup pipeline buckets by it. */
+  variantId: string;
   type: EventType;
   /** The metric definition's `event_name`, e.g. `checkout_completed`. */
   name: string;
