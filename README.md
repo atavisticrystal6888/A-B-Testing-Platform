@@ -33,8 +33,13 @@ Recent integration fixes completed:
 - Elixir apps: `apps/experiment_hub`, `apps/experiment_hub_web`, `apps/event_collector`, `apps/assignment_engine`
 - Rust core: `assignment_core/`
 - Dashboard: `dashboard/`
+- JavaScript SDK: `sdk/javascript/` (`@experiment-hub/sdk`, see its [README](sdk/javascript/README.md))
 - Python services: `statistical_engine/`, `data_pipeline/`
 - Specs and contracts: `specs/001-experimenthub-spec/`
+
+## Integrating an Application
+
+**Integrating an application.** Your app calls `POST /v1/assign` to pick a variant and `POST /v1/events` to report outcomes; everything else (stickiness, dedup, stats) happens server-side. The TypeScript client in [`sdk/javascript/`](sdk/javascript/README.md) wraps both with typed errors and a live contract suite.
 
 ## Documentation
 

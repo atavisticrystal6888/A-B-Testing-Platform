@@ -1,22 +1,27 @@
 # JavaScript / TypeScript SDK Quickstart
 
+The SDK lives in [`sdk/javascript/`](../../sdk/javascript/README.md). It is
+server-side only: the API key is a tenant secret and must never reach a browser.
+
 ## Installation
 
+The package is not published to npm yet; install it from the monorepo path.
+
 ```bash
-npm install @experiment-hub/sdk
-# or
-yarn add @experiment-hub/sdk
+cd sdk/javascript && npm install && npm run build
+# in your app:
+npm install ../path/to/A-B-Testing-Platform/sdk/javascript
 ```
 
 ## Configuration
 
 ```typescript
-import { ExperimentHub } from '@experiment-hub/sdk';
+import { createClient } from "@experiment-hub/sdk";
 
-const hub = new ExperimentHub({
-  baseUrl: 'https://your-instance.example.com',
-  apiKey: process.env.EXPERIMENT_HUB_API_KEY!,
-  tenantId: process.env.EXPERIMENT_HUB_TENANT_ID!,
+const hub = createClient({
+  baseUrl: process.env.EXPERIMENT_HUB_BASE_URL!, // e.g. http://127.0.0.1:4000
+  apiKey: process.env.EXPERIMENT_HUB_API_KEY!,   // the key identifies the tenant
+  timeoutMs: 2000,                               // optional, default 2000
 });
 ```
 
@@ -25,109 +30,74 @@ const hub = new ExperimentHub({
 ### Get a Variant Assignment
 
 ```typescript
-const assignment = await hub.assign('checkout-button-color', {
+const assignment = await hub.assign({
   userId: user.id,
-  context: { platform: 'web', country: user.country },
+  experimentKey: "checkout-copy-demo",
+  attributes: { platform: "web", country: user.country },
 });
 
-switch (assignment.variantId) {
-  case 'blue':
-    renderBlueButton();
-    break;
-  case 'green':
-    renderGreenButton();
-    break;
-  default:
-    renderDefaultButton();
+if (assignment.enrolled && assignment.variantKey === "reassurance-copy") {
+  renderReassuranceCopy();
+} else {
+  renderCurrentCopy();
 }
 ```
 
+`enrolled: false` means the experiment is not running or the user is not
+targeted; the server returns the control variant and records nothing.
+
 ### Track Events
 
+Events carry the experiment and variant UUIDs from the assignment.
+
 ```typescript
-await hub.track('purchase', {
-  experimentId: 'checkout-button-color',
+await hub.track({
   userId: user.id,
+  experimentId: assignment.experimentId,
   variantId: assignment.variantId,
-  properties: {
-    value: order.total,
-    currency: 'USD',
-  },
+  type: "conversion",
+  name: "checkout_completed",
+});
+
+await hub.track({
+  userId: user.id,
+  experimentId: assignment.experimentId,
+  variantId: assignment.variantId,
+  type: "revenue",
+  name: "order_completed",
+  value: 1299,
 });
 ```
 
 ### Batch Events
 
 ```typescript
-await hub.trackBatch([
-  { eventType: 'page_view', userId: 'u1', experimentId: 'exp-1', variantId: 'v1' },
-  { eventType: 'click', userId: 'u2', experimentId: 'exp-1', variantId: 'v2' },
+const receipt = await hub.trackBatch([
+  { userId: "u1", experimentId, variantId: controlId, type: "conversion", name: "checkout_completed" },
+  { userId: "u2", experimentId, variantId: treatmentId, type: "revenue", name: "order_completed", value: 49.99 },
 ]);
+// receipt.status is "accepted" or "partial"; inspect receipt.errors for rejected items
 ```
 
 ### Feature Flags
 
 ```typescript
-const darkMode = await hub.flagEnabled('dark-mode', { userId: user.id });
-
-if (darkMode) {
-  applyDarkTheme();
-}
-```
-
-### React Hook (Optional)
-
-```tsx
-import { useExperiment } from '@experiment-hub/react';
-
-function CheckoutButton() {
-  const { variant, isLoading } = useExperiment('checkout-button-color');
-
-  if (isLoading) return <ButtonSkeleton />;
-
-  return variant === 'blue' ? <BlueButton /> : <DefaultButton />;
-}
-```
-
-### Check Experiment Results
-
-```typescript
-const results = await hub.getResults('checkout-button-color');
-
-for (const variant of results.variants) {
-  console.log(`${variant.variantId}: ${variant.conversionRate} (p=${variant.pValue})`);
-}
-```
-
-## Error Handling
-
-```typescript
-try {
-  const assignment = await hub.assign('my-experiment', { userId: 'u1' });
-} catch (error) {
-  if (error instanceof ExperimentHubError) {
-    switch (error.code) {
-      case 'UNAUTHORIZED': // Invalid API key
-      case 'NOT_FOUND':    // Experiment not found
-      case 'RATE_LIMITED': // Too many requests
-      case 'TIMEOUT':      // Request timed out
-    }
-  }
-  // Fallback to control
-  return { variantId: 'control' };
-}
-```
-
-## Configuration Options
-
-```typescript
-const hub = new ExperimentHub({
-  baseUrl: 'https://your-instance.example.com',
-  apiKey: 'your-api-key',
-  tenantId: 'your-tenant-id',
-  timeout: 500,            // ms (default: 1000)
-  retryCount: 1,           // retries on failure (default: 0)
-  fallbackVariant: 'control', // returned on failure
-  cacheTimeout: 60_000,    // flag cache TTL in ms (default: 60000)
+const { enabled } = await hub.flags.evaluate({
+  key: "checkout_reassurance",
+  context: { user_id: user.id },
 });
+
+if (enabled) {
+  showReassurance();
+}
 ```
+
+A React package is not shipped; with server-side assignment the variant is a prop.
+
+## Error Handling and Fail-Open
+
+Every failure is an `ExperimentHubError` subclass (`ValidationError`,
+`AuthenticationError`, `NotFoundError`, `RateLimitError`,
+`ServiceUnavailableError`, `NetworkError`, `ApiError`). The SDK never fails
+open; see the [SDK README](../../sdk/javascript/README.md) for the error
+reference and a fail-open wrapper.

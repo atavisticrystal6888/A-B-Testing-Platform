@@ -1,8 +1,11 @@
 # ExperimentHub Public API Reference
 
-Base URL: `https://your-instance.example.com/api/v1`
+Base URL: `https://your-instance.example.com`
 
-All endpoints require `Authorization: Bearer <api_key>` and `X-Tenant-ID: <tenant_id>` headers.
+Authentication depends on the route family:
+
+- Runtime routes (`/v1/assign`, `/v1/events`, `/api/v1/flags/evaluate`): send `X-API-Key: <key>`.
+- Dashboard and management routes (`/api/v1/experiments`, ...): send `Authorization: Bearer <jwt>`.
 
 ---
 
@@ -48,7 +51,7 @@ Authenticate and receive a JWT token.
 
 ## Experiments
 
-### GET /experiments
+### GET /api/v1/experiments
 List all experiments for the current tenant.
 
 **Query Parameters:**
@@ -75,7 +78,7 @@ List all experiments for the current tenant.
 }
 ```
 
-### POST /experiments
+### POST /api/v1/experiments
 Create a new experiment.
 
 **Request Body:**
@@ -97,22 +100,22 @@ Create a new experiment.
 
 **Response:** `201 Created`
 
-### GET /experiments/:id
+### GET /api/v1/experiments/:id
 Get experiment details.
 
-### PUT /experiments/:id
+### PUT /api/v1/experiments/:id
 Update experiment configuration (draft only).
 
-### POST /experiments/:id/launch
+### POST /api/v1/experiments/:id/start
 Start running the experiment.
 
-### POST /experiments/:id/pause
+### POST /api/v1/experiments/:id/pause
 Pause a running experiment.
 
-### POST /experiments/:id/resume
+### POST /api/v1/experiments/:id/resume
 Resume a paused experiment.
 
-### POST /experiments/:id/conclude
+### POST /api/v1/experiments/:id/conclude
 Conclude experiment with a decision.
 
 **Request Body:**
@@ -128,29 +131,58 @@ Conclude experiment with a decision.
 
 ## Assignments
 
-### POST /assignments
+Runtime routes, authenticated with `X-API-Key`.
+
+### POST /v1/assign
 Get a variant assignment for a user.
 
 **Request Body:**
 ```json
 {
-  "experiment_id": "uuid-or-key",
   "user_id": "user-123",
-  "context": {
-    "platform": "web",
-    "country": "US"
-  }
+  "experiment_key": "checkout-copy-demo",
+  "attributes": { "platform": "web", "country": "US" }
 }
 ```
 
 **Response:** `200 OK`
 ```json
 {
-  "data": {
-    "variant_id": "blue",
-    "experiment_id": "uuid",
-    "is_new": true
-  }
+  "experiment_key": "checkout-copy-demo",
+  "variant_key": "reassurance-copy",
+  "variant_name": "Reassurance copy",
+  "experiment_id": "uuid",
+  "variant_id": "uuid",
+  "is_control": false,
+  "enrolled": true,
+  "assigned_at": "2026-01-15T10:30:00Z"
+}
+```
+
+When the experiment is not running or the user is not targeted, the control
+variant is returned with `enrolled: false` and nothing is recorded.
+
+### POST /v1/assign/batch
+Assign a user to several experiments at once.
+
+**Request Body:**
+```json
+{
+  "user_id": "user-123",
+  "experiment_keys": ["checkout-copy-demo", "unknown-key"],
+  "attributes": { "platform": "web" }
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "user_id": "user-123",
+  "assignments": [
+    { "experiment_key": "checkout-copy-demo", "experiment_id": "uuid", "variant_key": "control", "variant_id": "uuid", "is_control": true, "enrolled": true },
+    { "experiment_key": "unknown-key", "error": "experiment_not_found" }
+  ],
+  "assigned_at": "2026-01-15T10:30:00Z"
 }
 ```
 
@@ -158,39 +190,59 @@ Get a variant assignment for a user.
 
 ## Events
 
-### POST /events
+Runtime routes, authenticated with `X-API-Key`. Events require a UUID
+`experiment_id` and should carry `variant_id`: the rollup buckets by both.
+
+### POST /v1/events
 Track a single event.
 
 **Request Body:**
 ```json
 {
-  "event_type": "conversion",
-  "experiment_id": "uuid",
-  "variant_id": "blue",
   "user_id": "user-123",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "properties": {
-    "value": 49.99
-  }
+  "event_type": "revenue",
+  "event_name": "order_completed",
+  "experiment_id": "uuid",
+  "variant_id": "uuid",
+  "timestamp": "2026-01-15T10:30:00Z",
+  "idempotency_key": "d1c1c2f0-5b0e-4a53-9a39-0d5b7f3a1e11",
+  "value": 1299,
+  "properties": { "currency": "INR" }
 }
 ```
 
-**Response:** `202 Accepted`
+`event_type` is one of `conversion`, `metric`, `revenue`; `value` is required
+for `metric` and `revenue` events.
 
-### POST /events/batch
-Track multiple events.
+**Response:** `202 Accepted`
+```json
+{ "status": "accepted", "event_id": "uuid", "received_at": "2026-01-15T10:30:01Z" }
+```
+
+### POST /v1/events/batch
+Track multiple events (1 to 1000).
 
 **Request Body:**
 ```json
 {
   "events": [
-    { "event_type": "page_view", "experiment_id": "uuid", ... },
-    { "event_type": "click", "experiment_id": "uuid", ... }
+    { "user_id": "u1", "event_type": "conversion", "event_name": "checkout_completed", "experiment_id": "uuid", "variant_id": "uuid", "timestamp": "2026-01-15T10:30:00Z", "idempotency_key": "key-1" }
   ]
 }
 ```
 
-**Response:** `202 Accepted`
+**Response:** `202` (all accepted), `207` (partial) or `400` (all rejected):
+```json
+{
+  "status": "accepted",
+  "accepted": 1,
+  "rejected": 0,
+  "errors": []
+}
+```
+
+`status` is `accepted`, `partial` or `rejected`; each entry in `errors`
+identifies the failed event by its index.
 
 ---
 
@@ -235,25 +287,30 @@ Get statistical analysis results.
 
 ## Feature Flags
 
-### GET /flags/:flag_key
-Evaluate a feature flag.
+### POST /api/v1/flags/evaluate
+Evaluate a feature flag. Authenticated with `X-API-Key`.
 
-**Query Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| user_id | string | User ID for targeting |
-| context | object | Additional context for targeting rules |
+**Request Body:**
+```json
+{ "key": "checkout_reassurance", "context": { "user_id": "user-123" } }
+```
 
 **Response:** `200 OK`
 ```json
-{
-  "data": {
-    "flag_key": "dark-mode",
-    "enabled": true,
-    "variant": "enabled",
-    "rollout_percentage": 50
-  }
-}
+{ "key": "checkout_reassurance", "enabled": true }
+```
+
+### POST /api/v1/flags/evaluate/batch
+Evaluate several flags with one context.
+
+**Request Body:**
+```json
+{ "keys": ["checkout_reassurance", "dark-mode"], "context": { "user_id": "user-123" } }
+```
+
+**Response:** `200 OK`
+```json
+{ "data": [ { "key": "checkout_reassurance", "enabled": true }, { "key": "dark-mode", "enabled": false } ] }
 ```
 
 ### GET /feature-flags
